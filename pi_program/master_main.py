@@ -11,12 +11,16 @@
 import time
 import signal
 import sys
+import os
 import threading
 from datetime import datetime
 from lidar_parser import LidarConnection
 from event_detector import EventDetector
 from image_capture import ImageServer
 from lidar_data_server import LidarDataServer
+
+# Adds the parent directory to the search path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from communication_protocol import generate_event_id, Packet, PacketHeader, PACKET_ID_LIDAR_OUTGOING
 import json
 

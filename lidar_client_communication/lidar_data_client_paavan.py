@@ -98,7 +98,7 @@ def handle_lidar_packet(packet: Packet, download_dir="lidar_downloads"):
 
         # Generate filename and save LiDAR data
         timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
-        filename = f"lidar_scans_{packet.header.event_id}_{timestamp}.jsonl"
+        filename = f"event_data_{packet.header.event_id}_{timestamp}.jsonl"
         file_path = os.path.join(download_dir, filename)
 
         # Save JSONL payload

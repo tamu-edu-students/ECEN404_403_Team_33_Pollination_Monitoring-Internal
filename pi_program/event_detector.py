@@ -38,6 +38,10 @@ class EventDetector:
                 "flower_1": {
                     "angle_indices": [68, 69, 70, 71],
                     "background_dist": 0.269
+                },
+                "flower_2": {
+                    "angle_indices": [168, 169, 170, 171],
+                    "background_dist": 0.34
                 }
             }
         else:

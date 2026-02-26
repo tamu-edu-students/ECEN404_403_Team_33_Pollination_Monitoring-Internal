@@ -55,7 +55,8 @@ EVENT_END_CONFIRM_SCANS = 5
 WATCHDOG_TIMEOUT = 5.0          # Maximum time between scans before watchdog alert (seconds)
 
 # Connection Timeout Configuration
-CONNECTION_TIMEOUT = 15.0       # Timeout for connection attempts before prompting user (seconds)
+CONNECTION_TIMEOUT = 10.0       # Timeout for connection attempts before prompting user (seconds)
+LIDAR_CLIENT_TIMEOUT = True  # Flag to enable/disable waiting for LiDAR client connection at startup
 
 
 # -------------------------------
@@ -176,8 +177,8 @@ def _handle_event_start_async(event, event_count, image_server):
     flower_id = event["flower_id"]
     start_time = event["start_time"]
     
-    # Generate event ID from the event start timestamp
-    event_id = generate_event_id(start_time)
+    # Generate event ID from flower ID and event start timestamp
+    event_id = generate_event_id(start_time, flower_id)
     
     print(f"[ALERT] Flower visit #{event_count} started at flower {flower_id} at {start_time:.2f}s")
     print(f"[EVENT] Event ID generated: {event_id}")
@@ -223,8 +224,8 @@ def _handle_event_end_async(event, lidar_data_server, lidar_data_client_enabled)
     flower_id = event["flower_id"]
     end_time = event["end_time"]
     
-    # Generate event ID from the event start timestamp
-    event_id = generate_event_id(event["start_time"])
+    # Generate event ID from flower ID and event start timestamp
+    event_id = generate_event_id(event["start_time"], flower_id)
     
     print(f"[ALERT] Flower visit ended for {flower_id} at {end_time:.2f}s")
     print(f"[EVENT {event_id}] Processing event end data...")
@@ -327,7 +328,16 @@ def main():
             port=LIDAR_DATA_PORT,
             save_dir=LIDAR_DATA_SAVE_DIR
         )
-        connect_lidar_data_server_with_timeout(lidar_data_server)
+        
+        if LIDAR_CLIENT_TIMEOUT:    
+            connect_lidar_data_server_with_timeout(lidar_data_server)
+        else:
+            if not lidar_data_server.start_server():
+                print("[ERROR] Failed to start LiDAR data server. Exiting.")
+                if not lidar is None:
+                    lidar.disconnect()
+                image_server.stop_server()
+                return
         
         # Link servers for cross-client message routing
         print("\n[INIT] Linking servers for cross-client communication...")

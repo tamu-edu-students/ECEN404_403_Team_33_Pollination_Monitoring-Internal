@@ -156,19 +156,23 @@ class Packet:
         return f"Packet({self.header}, payload_size={len(self.payload)})"
 
 
-def generate_event_id(timestamp: float) -> str:
+def generate_event_id(timestamp: float, flower_id) -> str:
     """
-    Generate event ID from timestamp.
-    Format: "XXXXXXXX.XX" (8 digits before decimal, 2 after)
+    Generate event ID from flower ID and timestamp.
+    Format: "FXXXXXXXX.XX" where F is one flower digit (e.g. 1 or 2)
+    and timestamp keeps 8 digits before decimal, 2 after.
     Uses modulo to keep only last 8 digits for shorter IDs.
     
     Args:
         timestamp: Float from time.time()
+        flower_id: Flower identifier, e.g. "1", "2", or "flower_1"
     
     Returns:
         Event ID string
     """
-    return f"{timestamp % 100000000:08.2f}"
+    flower_text = str(flower_id)
+    flower_digit = next((ch for ch in reversed(flower_text) if ch.isdigit()), "0")
+    return f"{flower_digit}{timestamp % 100000000:08.2f}"
 
 
 def extract_timestamp_from_event_id(event_id: str) -> float:
@@ -176,9 +180,13 @@ def extract_timestamp_from_event_id(event_id: str) -> float:
     Extract timestamp from event ID.
     
     Args:
-        event_id: Event ID string in format "XXXXXX.XX"
+        event_id: Event ID string in format "FXXXXXXXX.XX" or legacy "XXXXXXXX.XX"
     
     Returns:
         Float timestamp
     """
-    return float(event_id)
+    
+    event_id_str = str(event_id)
+    if event_id_str and event_id_str[0].isdigit() and len(event_id_str) > 1 and "." in event_id_str[1:]:
+        return float("17" + event_id_str[1:])
+    return float("17" + event_id_str)

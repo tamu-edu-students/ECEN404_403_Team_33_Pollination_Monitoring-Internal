@@ -1,0 +1,19 @@
+{
+  "flower_1": {
+    "angle_indices": [
+      131,
+      132,
+      133,
+      134
+    ],
+    "background_dist": 0.342
+  },
+  "flower_2": {
+    "angle_indices": [
+      264,
+      265,
+      266
+    ],
+    "background_dist": 0.385
+  }
+}

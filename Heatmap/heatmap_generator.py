@@ -5,22 +5,26 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from datetime import datetime
+import os
 from lidar_ML.bee_classifier import BeeClassifier
 
-# ===============================
-# LIDAR CONFIG
-# ===============================
 ANGLE_START_DEG = 0.0
 ANGLE_INCREMENT_DEG = 0.5
 
-# ===============================
-# LOAD CLASSIFIER
-# ===============================
 classifier = BeeClassifier()
 
-# ===============================
-# POLAR TO XY
-# ===============================
+# ==========================================
+# GLOBAL STORAGE FOR ACCUMULATED VISITS
+# ==========================================
+# key = (rounded_x, rounded_y)
+# value = visit count
+flower_visit_counts = {}
+
+# distance threshold to consider same flower
+FLOWER_MATCH_THRESHOLD = 0.15  # meters
+
+
 def polar_to_xy(distance_m, angle_index):
     angle_deg = ANGLE_START_DEG + angle_index * ANGLE_INCREMENT_DEG
     angle_rad = math.radians(angle_deg)
@@ -28,11 +32,20 @@ def polar_to_xy(distance_m, angle_index):
     y = distance_m * math.sin(angle_rad)
     return x, y
 
-# ===============================
-# PROCESS EVENTS
-# ===============================
+
+def find_existing_flower(x, y):
+    """
+    Check if this detection is near an existing flower.
+    """
+    for (fx, fy) in flower_visit_counts.keys():
+        dist = math.sqrt((x - fx) ** 2 + (y - fy) ** 2)
+        if dist < FLOWER_MATCH_THRESHOLD:
+            return (fx, fy)
+    return None
+
+
 def process_file(filepath):
-    bee_positions = []
+    new_positions = []
 
     with open(filepath, "r") as f:
         for line in f:
@@ -54,51 +67,66 @@ def process_file(filepath):
                 xs.append(x)
                 ys.append(y)
 
-            bee_positions.append((np.mean(xs), np.mean(ys)))
+            new_positions.append((np.mean(xs), np.mean(ys)))
 
-    return bee_positions
+    return new_positions
 
-# ===============================
-# PLOT
-# ===============================
 def generate_heatmap_png(filepath):
 
-    bee_positions = process_file(filepath)
+    new_positions = process_file(filepath)
 
-    if len(bee_positions) == 0:
+    # ==========================================
+    # UPDATE GLOBAL FLOWER COUNTS
+    # ==========================================
+    for x, y in new_positions:
+
+        existing = find_existing_flower(x, y)
+
+        if existing:
+            flower_visit_counts[existing] += 1
+        else:
+            flower_visit_counts[(x, y)] = 1
+
+    if len(flower_visit_counts) == 0:
         return None
 
-    xs = [p[0] for p in bee_positions]
-    ys = [p[1] for p in bee_positions]
+    xs = []
+    ys = []
+    counts = []
+
+    for (x, y), count in flower_visit_counts.items():
+        xs.append(x)
+        ys.append(y)
+        counts.append(count)
+
+    total_visits = sum(counts)
 
     fig, ax = plt.subplots(figsize=(8, 8))
 
-    # soft background
     ax.set_facecolor("#f8fafc")
     fig.patch.set_facecolor("#ffffff")
 
-    # pollinator hits
-    ax.scatter(
+    scatter = ax.scatter(
         xs,
         ys,
-        s=350,
-        alpha=0.75,
+        s=[150 + c * 120 for c in counts],
+        c=counts,
+        cmap="viridis",
+        alpha=0.85,
         edgecolors="white",
         linewidth=1.5
     )
 
-    # remove top and right borders
+    plt.colorbar(scatter, ax=ax, label="Visits per Flower")
+
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    # clean axes
-    ax.set_xlabel("Distance X (m)", fontsize=11)
-    ax.set_ylabel("Distance Y (m)", fontsize=11)
+    ax.set_xlabel("Distance X (m)")
+    ax.set_ylabel("Distance Y (m)")
 
     ax.set_title(
-        f"Pollinator Activity Map\nTotal Visits: {len(bee_positions)}",
-        fontsize=14,
-        pad=20
+        f"Pollinator Activity Map\nTotal Visits: {total_visits}"
     )
 
     ax.set_aspect("equal", adjustable="box")
@@ -107,8 +135,28 @@ def generate_heatmap_png(filepath):
     ax.set_xlim(min(xs) - padding, max(xs) + padding)
     ax.set_ylim(min(ys) - padding, max(ys) + padding)
 
+    # ==========================================
+    # SAVE PNG LOCALLY
+    # ==========================================
+    output_dir = "generated_heatmaps"
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
+    filename = f"heatmap_{timestamp}.png"
+    file_path = os.path.join(output_dir, filename)
+
+    fig.savefig(file_path, dpi=300)
+
+    print(f"[HEATMAP] Saved locally: {file_path}")
+    print(f"[HEATMAP] Total visits so far: {total_visits}")
+
+    # ==========================================
+    # ALSO RETURN PNG BYTES FOR NETWORK
+    # ==========================================
     buffer = io.BytesIO()
-    plt.savefig(buffer, format="png", dpi=300)
+    fig.savefig(buffer, format="png", dpi=300)
     plt.close(fig)
 
     buffer.seek(0)

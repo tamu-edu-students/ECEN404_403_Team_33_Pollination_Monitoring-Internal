@@ -1,163 +1,172 @@
+# feature_extractor.py
+import os
 import json
-import numpy as np
-import pandas as pd
+import csv
+import statistics
 
-# ---------------------------------------------------
-# Adjust these paths
-# ---------------------------------------------------
+# Folder containing manually labeled event JSON files
+LABELED_FOLDER = "labeled_dataset"
 
-INPUT_FILE = "./flower_setup/flower_events_02-02-2026_17.00.55.jsonl"      # your event_detector output
-OUTPUT_FILE = "event_features.csv"
+# Folder where the extracted features CSV will be stored
+FEATURE_FOLDER = "features"
 
-# If you have background distances per flower from setup_flower
-# Replace these values with your real ones
-FLOWER_BACKGROUND = {
-    "flower_1": 0.36,
-}
+# Output CSV file
+OUTPUT_FILE = os.path.join(FEATURE_FOLDER, "features.csv")
 
-# ---------------------------------------------------
-# Helper functions
-# ---------------------------------------------------
+# Create features folder if it does not exist
+os.makedirs(FEATURE_FOLDER, exist_ok=True)
 
-def count_local_minima(signal):
-    count = 0
-    for i in range(1, len(signal) - 1):
-        if signal[i] < signal[i - 1] and signal[i] < signal[i + 1]:
-            count += 1
-    return count
-
-
-def count_sign_changes(diff_signal):
-    count = 0
-    for i in range(1, len(diff_signal)):
-        if diff_signal[i - 1] * diff_signal[i] < 0:
-            count += 1
-    return count
-
-
-# ---------------------------------------------------
-# Main feature extraction
-# ---------------------------------------------------
 
 def extract_features(event):
-    event_id = event["event_id"]
-    flower_id = event["flower_id"]
-    start_time = event["start_time"]
-    end_time = event["end_time"]
+    """
+    Extract numerical ML features from a single event JSON.
+    These features describe how the object behaved in the LiDAR scans.
+    """
+
+    # -----------------------------
+    # Basic timing features
+    # -----------------------------
+    duration = event["end_time"] - event["start_time"]
     num_scans = event["num_scans"]
-    angles = event["angles"]
-    distance_series = np.array(event["distance_series"])
 
-    num_angles = len(angles)
-    visit_duration = end_time - start_time
+    # scans per second during the event
+    scans_per_second = num_scans / duration if duration > 0 else 0
 
-    # background distance for this flower
-    background_distance = FLOWER_BACKGROUND.get(flower_id, None)
+    # background distance recorded when the flower was calibrated
+    background = event["background_dist"]
 
-    # ---- Core signals ----
+    # -----------------------------
+    # Flatten all distances
+    # Convert list of scans -> single list
+    # -----------------------------
+    all_distances = [d for scan in event["distance_series"] for d in scan]
 
-    min_dist = np.min(distance_series, axis=1)
-    mean_dist = np.mean(distance_series, axis=1)
-    spread = np.max(distance_series, axis=1) - np.min(distance_series, axis=1)
+    # -----------------------------
+    # Basic distance statistics
+    # -----------------------------
+    min_distance = min(all_distances)
+    max_distance = max(all_distances)
+    mean_distance = statistics.mean(all_distances)
 
-    # ---- Temporal features ----
+    std_distance = (
+        statistics.stdev(all_distances)
+        if len(all_distances) > 1 else 0
+    )
 
-    min_distance_reached = np.min(min_dist)
-    mean_distance_during_visit = np.mean(min_dist)
+    # -----------------------------
+    # Intrusion calculations
+    # How much the object blocked the background
+    # -----------------------------
+    intrusions = [background - d for d in all_distances]
 
-    if background_distance is not None:
-        depth_of_interaction = background_distance - min_distance_reached
-    else:
-        depth_of_interaction = 0.0
+    max_intrusion = max(intrusions)
+    mean_intrusion = statistics.mean(intrusions)
 
-    idx_min = np.argmin(min_dist)
+    intrusion_std = (
+        statistics.stdev(intrusions)
+        if len(intrusions) > 1 else 0
+    )
 
-    # avoid division by zero
-    if visit_duration > 0 and num_scans > 1:
-        time_to_min = visit_duration * (idx_min / num_scans)
-        time_from_min = visit_duration - time_to_min
+    # -----------------------------
+    # NEW FEATURE 1
+    # intrusion_ratio
+    # Normalizes intrusion relative to background distance
+    # Helps when flowers have different distances later
+    # -----------------------------
+    intrusion_ratio = max_intrusion / background if background > 0 else 0
 
-        if time_to_min > 0:
-            approach_speed = (min_dist[0] - min_dist[idx_min]) / time_to_min
-        else:
-            approach_speed = 0.0
+    # -----------------------------
+    # NEW FEATURE 2
+    # temporal_variation
+    # Measures movement of the object across time
+    # Compute mean distance per scan, then measure variation
+    # -----------------------------
+    scan_means = [statistics.mean(scan) for scan in event["distance_series"]]
 
-        if time_from_min > 0:
-            departure_speed = (min_dist[-1] - min_dist[idx_min]) / time_from_min
-        else:
-            departure_speed = 0.0
-    else:
-        approach_speed = 0.0
-        departure_speed = 0.0
+    temporal_variation = (
+        statistics.stdev(scan_means)
+        if len(scan_means) > 1 else 0
+    )
 
-    symmetry = abs(approach_speed - departure_speed)
+    # -----------------------------
+    # NEW FEATURE 3
+    # spatial_spread
+    # Number of LiDAR angles involved in the event
+    # Larger objects cover more angles
+    # -----------------------------
+    spatial_spread = len(event["angles"])
 
-    # ---- Oscillation and jitter ----
+    # Return all features as a list for CSV writing
+    return [
+        event["event_id"],
+        duration,
+        num_scans,
+        scans_per_second,
+        min_distance,
+        max_distance,
+        mean_distance,
+        std_distance,
+        max_intrusion,
+        mean_intrusion,
+        intrusion_std,
+        intrusion_ratio,
+        temporal_variation,
+        spatial_spread,
+        event["label"]
+    ]
 
-    std_min_dist = np.std(min_dist)
-
-    local_minima_count = count_local_minima(min_dist)
-
-    diff_signal = np.diff(min_dist)
-    sign_change_count = count_sign_changes(diff_signal)
-
-    total_movement_energy = np.sum(np.abs(diff_signal))
-
-    # ---- Spatial features ----
-
-    mean_spread = np.mean(spread)
-    spread_variance = np.var(spread)
-
-    # angle stability
-    angle_std = np.std(distance_series, axis=0)
-    angle_stability = np.mean(angle_std)
-
-    # ---- Build feature dictionary ----
-
-    features = {
-        "event_id": event_id,
-        "flower_id": flower_id,
-        "visit_duration": visit_duration,
-        "num_scans": num_scans,
-        "num_angles": num_angles,
-        "min_distance_reached": min_distance_reached,
-        "mean_distance_during_visit": mean_distance_during_visit,
-        "depth_of_interaction": depth_of_interaction,
-        "approach_speed": approach_speed,
-        "departure_speed": departure_speed,
-        "symmetry": symmetry,
-        "std_min_dist": std_min_dist,
-        "local_minima_count": local_minima_count,
-        "sign_change_count": sign_change_count,
-        "total_movement_energy": total_movement_energy,
-        "mean_spread": mean_spread,
-        "spread_variance": spread_variance,
-        "angle_stability": angle_stability,
-    }
-
-    return features
-
-
-# ---------------------------------------------------
-# Run extraction on entire file
-# ---------------------------------------------------
 
 def main():
-    feature_rows = []
+    """
+    Loop through labeled JSON events and extract features
+    into a single CSV dataset for ML training.
+    """
 
-    with open(INPUT_FILE, "r") as f:
-        for line in f:
-            event = json.loads(line.strip())
+    # Only process JSON files
+    files = sorted(f for f in os.listdir(LABELED_FOLDER) if f.endswith(".json"))
+
+    with open(OUTPUT_FILE, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+
+        # CSV header
+        writer.writerow([
+            "event_id",
+            "duration",
+            "num_scans",
+            "scans_per_second",
+            "min_distance",
+            "max_distance",
+            "mean_distance",
+            "std_distance",
+            "max_intrusion",
+            "mean_intrusion",
+            "intrusion_std",
+            "intrusion_ratio",
+            "temporal_variation",
+            "spatial_spread",
+            "label"
+        ])
+
+        # Process each labeled event
+        for filename in files:
+            path = os.path.join(LABELED_FOLDER, filename)
+
+            try:
+                # Load event JSON
+                with open(path, "r", encoding="utf-8") as f:
+                    event = json.load(f)
+            except Exception as e:
+                print(f"Skipping {filename}: {e}")
+                continue
+
+            # Extract features
             features = extract_features(event)
-            feature_rows.append(features)
 
-    df = pd.DataFrame(feature_rows)
+            # Write to CSV
+            writer.writerow(features)
 
-    # Save CSV
-    df.to_csv(OUTPUT_FILE, index=False)
-
-    print(f"Saved features to {OUTPUT_FILE}")
-    print(f"Total events processed: {len(df)}")
+    print("Feature extraction complete.")
+    print(f"Saved to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

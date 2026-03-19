@@ -66,13 +66,35 @@ running = True
 last_scan_time = None
 testing_mode = False            # Flag for LiDAR scanner testing mode
 lidar_data_client_enabled = True # Flag for LiDAR data client availability
+active_image_server = None
+active_lidar_data_server = None
+active_lidar_connection = None
 
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
-    global running
+    global running, active_image_server, active_lidar_data_server, active_lidar_connection
     print("\n[SHUTDOWN] Received interrupt signal, shutting down...")
     running = False
+
+    # Force-unblock any pending socket waits (accept/recv) during startup/runtime.
+    try:
+        if active_image_server:
+            active_image_server.stop_server()
+    except Exception:
+        pass
+
+    try:
+        if active_lidar_data_server:
+            active_lidar_data_server.stop_server()
+    except Exception:
+        pass
+
+    try:
+        if active_lidar_connection and not testing_mode:
+            active_lidar_connection.disconnect()
+    except Exception:
+        pass
 
 
 def watchdog_check(current_time):
@@ -194,8 +216,11 @@ def _handle_event_start_async(event, event_count, image_server):
                 image_paths.append(image_path)
         
         if image_paths:
-            image_server.send_images_with_packet(event_id, image_paths)
-            print(f"[EVENT {event_id}] Successfully sent {len(image_paths)} images")
+            sent_ok = image_server.send_images_with_packet(event_id, image_paths)
+            if sent_ok:
+                print(f"[EVENT {event_id}] Successfully sent {len(image_paths)} images")
+            else:
+                print(f"[EVENT {event_id}] Failed to send image packet(s)")
         else:
             print(f"[EVENT {event_id}] Failed to capture any images")
     else:
@@ -282,6 +307,7 @@ def main():
     Master main function coordinating all subsystems.
     """
     global running, last_scan_time, testing_mode, lidar_data_client_enabled
+    global active_image_server, active_lidar_data_server, active_lidar_connection
     
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
@@ -302,6 +328,7 @@ def main():
         # 1. Connect to LiDAR with timeout and testing mode support
         print("\n[INIT] Initializing LiDAR connection...")
         lidar, testing_mode = connect_lidar_with_timeout(LIDAR_HOST, LIDAR_PORT)
+        active_lidar_connection = lidar
         
         if lidar is None and not testing_mode:
             print("[ERROR] Failed to initialize LiDAR connection. Exiting.")
@@ -315,6 +342,7 @@ def main():
             save_dir=IMAGE_SAVE_DIR,
             resolution=IMAGE_RESOLUTION
         )
+        active_image_server = image_server
         if not image_server.start_server():
             print("[ERROR] Failed to start image server. Exiting.")
             if not lidar is None:
@@ -328,6 +356,7 @@ def main():
             port=LIDAR_DATA_PORT,
             save_dir=LIDAR_DATA_SAVE_DIR
         )
+        active_lidar_data_server = lidar_data_server
         
         if LIDAR_CLIENT_TIMEOUT:    
             connect_lidar_data_server_with_timeout(lidar_data_server)
@@ -509,6 +538,10 @@ def main():
         
         if lidar_data_server:
             lidar_data_server.stop_server()
+
+        active_image_server = None
+        active_lidar_data_server = None
+        active_lidar_connection = None
         
         print("[SHUTDOWN] Complete")
 

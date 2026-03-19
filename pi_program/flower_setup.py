@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import statistics
 import os
+import math
 
 HOST = "169.254.251.84"
 PORT = 2112
@@ -17,6 +18,8 @@ MAX_PLANT_DIST = 0.5  # meters
 MIN_BLOCK_SIZE = 3
 MAX_BLOCK_SIZE = 7
 MAX_DIST_STD = 0.08
+MAX_VALID_RANGE = 10.0      # adjust to your sensor/environment
+MAX_GAP_POINTS = 1          # allow one invalid point inside a cluster
 
 # Temporal persistence parameters
 ANGLE_TOLERANCE = 2
@@ -43,6 +46,9 @@ def parse_scan(telegram):
         ]
     except Exception:
         return None
+    
+def is_valid(d):
+    return math.isfinite(d) and d > 0 and d < MAX_VALID_RANGE
 
 def extract_clusters_from_scan(distances):
     """
@@ -53,16 +59,36 @@ def extract_clusters_from_scan(distances):
     if not distances:
         return clusters
         
-    current_block = [0]
+    current_block = []
+    gap_count = 0
     
-    for i in range(1, len(distances)):
+    for i, d in enumerate(distances):
+        if not is_valid(d):
+            # tolerate tiny invalid gaps inside an existing cluster
+            if current_block and gap_count < MAX_GAP_POINTS:
+                gap_count += 1
+                continue
+            process_potential_cluster(current_block, distances, clusters)
+            current_block = []
+            gap_count = 0
+            continue
+
+        if not current_block:
+            current_block = [i]
+            gap_count = 0
+            continue
+
+        prev_i = current_block[-1]
+        prev_d = distances[prev_i]
+
         # Check if the next point is physically close to the previous one
-        if abs(distances[i] - distances[i - 1]) <= MAX_DIST_STD:
+        if is_valid(prev_d) and abs(d - prev_d) <= MAX_DIST_STD:
             current_block.append(i)
         else:
             # Process the block we just finished
             process_potential_cluster(current_block, distances, clusters)
             current_block = [i]
+            gap_count = 0
 
     # Don't forget the last block in the scan
     process_potential_cluster(current_block, distances, clusters)

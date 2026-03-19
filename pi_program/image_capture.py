@@ -8,6 +8,7 @@
 """
 
 import socket
+import select
 import os
 import subprocess
 from datetime import datetime
@@ -48,19 +49,34 @@ class ImageServer:
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
     
-    def start_server(self):
-        """Start server and wait for client connection"""
+    def start_server(self, accept_timeout=1.0):
+        """Start server and wait for client connection.
+
+        Uses short accept timeouts so Ctrl+C/shutdown can stop cleanly
+        even before a client finishes connecting.
+        """
         try:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((self.host, self.port))
             self.server_socket.listen(1)
+            self.server_socket.settimeout(accept_timeout)
             self.running = True
             print(f"Image server listening on {self.host}:{self.port}")
             print("Waiting for client connection...")
             
-            # Accept client connection
-            self.client_socket, self.client_address = self.server_socket.accept()
+            # Accept client connection in an interruptible loop.
+            while self.running and not self.connected:
+                try:
+                    self.client_socket, self.client_address = self.server_socket.accept()
+                    self.connected = True
+                except socket.timeout:
+                    continue
+
+            if not self.connected:
+                print("Image server stopped before client connected")
+                return False
+
             self.connected = True
             print(f"Image client connected: {self.client_address}")
             
@@ -81,7 +97,7 @@ class ImageServer:
         
         if self.client_socket:
             try:
-                self.client_socket.send("QUIT".encode())
+                self.client_socket.shutdown(socket.SHUT_RDWR)
                 self.client_socket.close()
             except:
                 pass
@@ -102,7 +118,10 @@ class ImageServer:
         """
         while self.running and self.connected:
             try:
-                self.client_socket.settimeout(0.5)
+                readable, _, _ = select.select([self.client_socket], [], [], 0.5)
+                if not readable:
+                    continue
+
                 data = self.client_socket.recv(4096)
                 
                 if not data:
@@ -126,8 +145,6 @@ class ImageServer:
                     if packet:
                         self._handle_received_packet(packet)
                 
-            except socket.timeout:
-                continue
             except Exception as e:
                 if self.running:
                     print(f"Error in image server receive loop: {e}")
@@ -233,6 +250,10 @@ class ImageServer:
                 
             
             return True
+
+        except TimeoutError:
+            print(f"Error sending image packet: timed out")
+            return False
             
         except Exception as e:
             print(f"Error sending image packet: {e}")

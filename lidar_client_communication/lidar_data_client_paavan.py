@@ -69,7 +69,7 @@ def receive_packet(receive_buffer: bytes):
         packet_data = receive_buffer[:packet_size]
         remaining_buffer = receive_buffer[packet_size:]
 
-        print(f"[DEBUG] Deserializing complete packet of {packet_size} bytes")
+        # print(f"[DEBUG] Deserializing complete packet of {packet_size} bytes")
 
         packet = Packet.deserialize(packet_data)
 
@@ -115,10 +115,10 @@ def handle_lidar_packet(packet: Packet, download_dir="lidar_downloads"):
         with open(file_path, "wb") as f:
             f.write(packet.payload)
 
-        print(f"[LIDAR CLIENT] Received and Saved Scan data")
+        print("=" * 90)
         print(f"[LIDAR CLIENT] Event ID: {packet.header.event_id}")
-        print(f"[LIDAR CLIENT] File: {file_path}")
-        print(f"[LIDAR CLIENT] Payload size: {len(packet.payload)} bytes")
+        print(f"[LIDAR CLIENT] Received and Saved Scan data || File: {file_path}")
+        # print(f"[LIDAR CLIENT] Payload size: {len(packet.payload)} bytes")
         print(f"[LIDAR CLIENT] Waiting for image client response (2050)...")
 
         # return packet.header.event_id, file_path
@@ -143,7 +143,7 @@ def handle_image_response_packet(packet: Packet):
         event_id of the response
     """
     print(f"[LIDAR-IMAGE CLIENT] Received image response (2050) from image client")
-    print(f"[LIDAR-IMAGE CLIENT] Event ID: {packet.header.event_id}")
+    # print(f"[LIDAR-IMAGE CLIENT] Event ID: {packet.header.event_id}")
     try:
         payload_str = packet.payload.decode("utf-8")
         lines = payload_str.strip().split("\n")
@@ -164,14 +164,12 @@ def handle_image_response_packet(packet: Packet):
                 class_name = det.get("class_name", "").lower()
                 confidence = det.get("confidence", 0)
                 
-                if class_name in ["honeybee", "bumblebee"]:
+                if class_name == "bee":
+                    pollinator_detected = True
                     if confidence > max_conf:
                         max_conf = confidence
-                    if confidence > 0.5:
-                        pollinator_detected = True
 
-            print(f"[CAMERA] Detections: {total}")
-            print(f"[CAMERA] Pollinator: {pollinator_detected} | Max Conf: {max_conf:.3f}")
+            print(f"[LIDAR-IMAGE CLIENT] Detections: {total} || Pollinator: {pollinator_detected} || Max Conf: {max_conf:.3f}")
 
             results.append({
                 "pollinator": pollinator_detected,
@@ -205,8 +203,7 @@ def create_lidar_response_packet(event_id: str, json_file_path: str, camera_data
     packet = Packet(header, png_bytes) # Payload is the PNG image bytes
 
     print(f"[LIDAR CLIENT] Heatmap ready ({len(png_bytes)} bytes)")
-    print('Heatmap generated and saved as pollinator_map.png')
-    print("[LIDAR CLIENT] Sending 2025 response to server\n")
+    print("[LIDAR CLIENT] Sending 2025 response to server")
 
     return packet
 
@@ -274,7 +271,9 @@ def main():
 
                         client_socket.sendall(response_packet.serialize())
 
-                        print(f"[LIDAR CLIENT] Sent 2025 response for event {event_id}\n")
+                        print(f"[LIDAR CLIENT] Sent 2025 response for event {event_id}")
+                        print("=" * 90)
+                        print()
 
                         del pending_files[event_id]
                         if event_id in camera_results:

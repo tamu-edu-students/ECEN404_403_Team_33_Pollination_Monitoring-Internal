@@ -8,13 +8,13 @@
     "lint": "echo \"no linter configured\""
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
     "express": "^4.18.2",
-    "ws": "^8.13.0",
-    "dotenv": "^16.0.0",
-    "winston": "^3.9.0",
+    "form-data": "^4.0.0",
     "node-fetch": "^2.6.7",
-    "form-data": "^4.0.0", 
-    "cors": "^2.8.5"
+    "winston": "^3.9.0",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

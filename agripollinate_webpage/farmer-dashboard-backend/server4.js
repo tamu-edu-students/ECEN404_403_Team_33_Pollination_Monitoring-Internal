@@ -1,3 +1,4 @@
+require('dotenv').config();
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
@@ -11,11 +12,11 @@ app.use(cors());
 app.use(express.json());
 
 // --- CONFIGURATION ---
-const raspberryPiHost = '192.168.1.74'; //'10.250.76.217'
-const raspberryPiPort = 12345;
-const httpPort = 3000;
-const downloadDir = path.join(__dirname, 'downloads');
-const ML_SERVICE_URL = 'http://localhost:5000';
+const raspberryPiHost = process.env.RASPBERRY_PI_HOST || '10.250.76.217';
+const raspberryPiPort = process.env.RASPBERRY_PI_PORT || 12345;
+const httpPort = process.env.PORT || 3000;
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
+const downloadDir = process.env.DOWNLOAD_DIR || path.join(__dirname, 'downloads');
 
 if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
 
@@ -265,13 +266,15 @@ function connectToRaspberryPi() {
     });
 
     piSocket.on('end', () => {
-        console.log('Server closed connection');
+        console.log('Server closed connection, reconnecting in 5s...');
         piSocket = null;
+        setTimeout(connectToRaspberryPi, 5000); // retry after 5 seconds
     });
 
     piSocket.on('error', (err) => {
-        console.error(`Connection error: ${err.message}`);
+        console.error(`Connection error: ${err.message}, reconnecting in 5s...`);
         piSocket = null;
+        setTimeout(connectToRaspberryPi, 5000); // retry after 5 seconds
     });
 }
 

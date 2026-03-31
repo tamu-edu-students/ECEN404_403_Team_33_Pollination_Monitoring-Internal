@@ -27,7 +27,7 @@
 
 4. **Install dependencies**
 ```bash
-   pip install fastapi uvicorn ultralytics pillow torch torchvision
+   pip install fastapi uvicorn ultralytics pillow torch torchvision python-multipart
 ```
 
 5. **Run the ML server**

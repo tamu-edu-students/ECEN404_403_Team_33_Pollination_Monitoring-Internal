@@ -6,16 +6,16 @@ function initTailscale() {
         console.log('⚠️ No Tailscale auth key, skipping...');
         return;
     }
-    exec('tailscaled --state=/tmp/tailscaled.state &', () => {
+    exec('/tmp/tailscaled --state=/tmp/tailscaled.state &', () => {
         setTimeout(() => {
-            exec(`/usr/local/bin/tailscale up --authkey=${process.env.TAILSCALE_AUTHKEY} --accept-routes`, (err, stdout, stderr) => {
+            exec(`/tmp/tailscale up --authkey=${authKey} --accept-routes`, (err) => {
                 if (err) {
                     console.error('❌ Tailscale error:', err.message);
                     return;
                 }
                 console.log('✅ Tailscale connected');
             });
-        }, 3000); // wait 3 seconds for daemon to start
+        }, 3000);
     });
 }
 

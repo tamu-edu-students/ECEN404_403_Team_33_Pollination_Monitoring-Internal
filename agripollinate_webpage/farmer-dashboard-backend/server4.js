@@ -8,7 +8,7 @@ function initTailscale() {
     }
     exec('/tmp/tailscaled --state=/tmp/tailscaled.state &', () => {
         setTimeout(() => {
-            exec(`/tmp/tailscale up --authkey=${authKey} --accept-routes`, (err) => {
+            exec(`/tmp/tailscale up --authkey=${process.env.TAILSCALE_AUTH_KEY} --accept-routes`, (err) => {
                 if (err) {
                     console.error('❌ Tailscale error:', err.message);
                     return;

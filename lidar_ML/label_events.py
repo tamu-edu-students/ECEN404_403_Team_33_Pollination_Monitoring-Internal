@@ -2,7 +2,7 @@ import os
 import json
 
 RAW_FOLDER = "raw_dataset"
-LABELED_FOLDER = "labeled_dataset"
+LABELED_FOLDER = "new_labeled_dataset"
 
 os.makedirs(LABELED_FOLDER, exist_ok=True)
 
@@ -62,7 +62,7 @@ def main():
         with open(labeled_path, "w") as f:
             json.dump(event, f, indent=4)
 
-        print("Saved to labeled_dataset")
+        print(f"Saved to {LABELED_FOLDER}")
 
     print("\nLabeling complete.")
 

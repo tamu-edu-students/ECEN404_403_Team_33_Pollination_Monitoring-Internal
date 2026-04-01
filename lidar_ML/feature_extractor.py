@@ -5,7 +5,7 @@ import csv
 import statistics
 
 # Folder containing manually labeled event JSON files
-LABELED_FOLDER = "labeled_dataset"
+LABELED_FOLDER = "new_labeled_dataset"
 
 # Folder where the extracted features CSV will be stored
 FEATURE_FOLDER = "features"

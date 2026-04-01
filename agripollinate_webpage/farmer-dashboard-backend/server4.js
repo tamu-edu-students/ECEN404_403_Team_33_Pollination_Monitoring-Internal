@@ -2,11 +2,11 @@ require('dotenv').config();
 const { exec } = require('child_process');
 
 function initTailscale() {
-    if (!process.env.TAILSCALE_AUTHKEY) {
+    if (!process.env.TAILSCALE_AUTH_KEY) {
         console.log('⚠️ No Tailscale auth key, skipping...');
         return;
     }
-    exec(`tailscale up --authkey=${process.env.TAILSCALE_AUTHKEY} --accept-routes`, (err, stdout, stderr) => {
+    exec(`tailscale up --authkey=${process.env.TAILSCALE_AUTH_KEY} --accept-routes`, (err, stdout, stderr) => {
         if (err) {
             console.error('❌ Tailscale error:', err.message);
             return;

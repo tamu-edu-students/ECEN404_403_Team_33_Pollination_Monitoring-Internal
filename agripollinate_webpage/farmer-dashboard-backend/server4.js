@@ -1,18 +1,21 @@
 require('dotenv').config();
-const tsnet = require('tsnet');
+const { exec } = require('child_process');
 
-async function initTailscale() {
-    try {
-        const ts = new tsnet.Server({
-            hostname: 'render-backend',
-            authkey: process.env.TAILSCALE_AUTHKEY
-        });
-        await ts.ready();
-        console.log('✅ Tailscale connected');
-    } catch (e) {
-        console.error('❌ Tailscale error:', e.message);
+function initTailscale() {
+    if (!process.env.TAILSCALE_AUTHKEY) {
+        console.log('⚠️ No Tailscale auth key, skipping...');
+        return;
     }
+    exec(`tailscale up --authkey=${process.env.TAILSCALE_AUTHKEY} --accept-routes`, (err, stdout, stderr) => {
+        if (err) {
+            console.error('❌ Tailscale error:', err.message);
+            return;
+        }
+        console.log('✅ Tailscale connected');
+    });
 }
+
+initTailscale();
 
 initTailscale();
 const net = require('net');

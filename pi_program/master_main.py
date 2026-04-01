@@ -58,6 +58,8 @@ WATCHDOG_TIMEOUT = 5.0          # Maximum time between scans before watchdog ale
 CONNECTION_TIMEOUT = 60.0       # Timeout for connection attempts before prompting user (seconds)
 LIDAR_CLIENT_TIMEOUT = True  # Flag to enable/disable waiting for LiDAR client connection at startup
 
+# File Cleanup Configuration
+MAX_AGE_SECONDS = 1800  # Maximum age of files to keep (30 mins)
 
 # -------------------------------
 # Global State
@@ -303,6 +305,22 @@ def on_event_end(event, lidar_data_server):
     )
     worker.start()
 
+def cleanup_old_files(log_dir):
+    now = time.time()
+
+    for filename in os.listdir(log_dir):
+        filepath = os.path.join(log_dir, filename)
+
+        if os.path.isfile(filepath):
+            file_age = now - os.path.getmtime(filepath)
+
+            if file_age > MAX_AGE_SECONDS:
+                try:
+                    os.remove(filepath)
+                    print(f"Deleted: {filepath}")
+                except Exception as e:
+                    print(f"Error deleting {filepath}: {e}")
+                    break  # Stop cleanup if there's an error to avoid potential issues
 
 def main():
     """
@@ -388,9 +406,11 @@ def main():
         )
 
         required_lidar_indices = sorted({
-            idx
+            idx + offset
             for flower_cfg in detector.flowers.values()
             for idx in flower_cfg["angle_indices"]
+            for offset in range(-2, 3)  # Include neighboring indices for robustness
+            if (idx + offset) >= 0
         })
         
         if testing_mode:
@@ -422,6 +442,7 @@ def main():
         # 5. Main processing loop
         scan_count = 0
         start_time = time.time()
+        last_cleanup_time = start_time
         object_count = 0
         
         if testing_mode:
@@ -461,6 +482,13 @@ def main():
                     }
                     on_event_end(event_end, lidar_data_server)
                     print()
+                    
+                    # Periodic file cleanup
+                    if time.time() - last_cleanup_time > MAX_AGE_SECONDS:
+                        print("[CLEANUP] Running periodic file cleanup...")
+                        cleanup_old_files(IMAGE_SAVE_DIR)
+                        cleanup_old_files(LIDAR_DATA_SAVE_DIR)
+                        last_cleanup_time = time.time()
                     
                 except KeyboardInterrupt:
                     running = False
@@ -506,6 +534,13 @@ def main():
                     elapsed = time.time() - start_time
                     print(f"[STATUS] Scans: {scan_count} | Events triggered: {object_count} "
                           f"| Elapsed: {elapsed:.1f}s")
+                
+                # Periodic file cleanup
+                if time.time() - last_cleanup_time > MAX_AGE_SECONDS:
+                        print("[CLEANUP] Running periodic file cleanup...")
+                        cleanup_old_files(IMAGE_SAVE_DIR)
+                        cleanup_old_files(LIDAR_DATA_SAVE_DIR)
+                        last_cleanup_time = time.time()
         
         # Shutdown
         print("\n[SHUTDOWN] Main loop stopped")

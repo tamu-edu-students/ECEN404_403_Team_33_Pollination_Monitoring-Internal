@@ -6,9 +6,9 @@ function initTailscale() {
         console.log('⚠️ No Tailscale auth key, skipping...');
         return;
     }
-    exec('/tmp/tailscaled --state=/tmp/tailscaled.state &', () => {
+    exec('./tailscaled --state=/tmp/tailscaled.state &', () => {
         setTimeout(() => {
-            exec(`/tmp/tailscale up --authkey=${process.env.TAILSCALE_AUTH_KEY} --accept-routes`, (err) => {
+            exec(`./tailscale up --authkey=${process.env.TAILSCALE_AUTH_KEY} --accept-routes`, (err) => {
                 if (err) {
                     console.error('❌ Tailscale error:', err.message);
                     return;

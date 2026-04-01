@@ -2,10 +2,11 @@
 import io
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 import math
-from datetime import datetime
 import os
+import json 
+from datetime import datetime
+import matplotlib.pyplot as plt
 from lidar_ML.bee_classifier import BeeClassifier
 
 ANGLE_START_DEG = 0.0
@@ -118,18 +119,21 @@ def process_file(filepath, camera_data=None):
                 if camera_conf >= lidar_conf:
                     is_bee = camera_is_bee
                     source = "CAMERA"
+                    final_conf = camera_conf
                 else:
                     is_bee = lidar_is_bee
                     source = "LIDAR"
+                    final_conf = lidar_conf
             else:
                 is_bee = lidar_is_bee
                 source = "LIDAR"
+                final_conf = lidar_conf
 
             status = "DETECTED" if is_bee else "SKIPPED"
 
             print(f"{str(event_id):<15} {source:<10} "
                   f"{'pollinator' if is_bee else 'not_pollinator':<18} "
-                  f"{max(camera_conf, lidar_conf):0.3f}          {status}")
+                  f"{final_conf:0.3f}          {status}")
 
             print("-" * 70)
 
@@ -176,9 +180,14 @@ def generate_heatmap_png(filepath, camera_data=None):
         else:
             flower_visit_counts[(x, y)] = 1
 
-    if len(flower_visit_counts) == 0:
-        return None
+    # if len(flower_visit_counts) == 0:
+    #     return None
+    pollinator_detected = len(new_positions) > 0
+    detection_json_bytes = json.dumps({"pollinator_detected": pollinator_detected}).encode("utf-8")
 
+    if len(flower_visit_counts) == 0:
+        return None, detection_json_bytes
+    
     xs = []
     ys = []
     counts = []
@@ -242,4 +251,4 @@ def generate_heatmap_png(filepath, camera_data=None):
     plt.close(fig)
 
     buffer.seek(0)
-    return buffer.read()
+    return buffer.read(), detection_json_bytes

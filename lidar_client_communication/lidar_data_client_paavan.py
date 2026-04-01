@@ -15,6 +15,7 @@ import socket
 import os
 import sys
 import json
+import struct
 from datetime import datetime
 
 # ============================================================
@@ -193,16 +194,42 @@ def create_lidar_response_packet(event_id: str, json_file_path: str, camera_data
 
     print("[LIDAR CLIENT] Generating heatmap...")
 
-    png_bytes = generate_heatmap_png(json_file_path, camera_data)
+    # png_bytes = generate_heatmap_png(json_file_path, camera_data)
 
-    if png_bytes is None:
+    # if png_bytes is None:
+    #     print("[LIDAR CLIENT] No bees detected. Sending empty payload.")
+    #     png_bytes = b""
+
+    # header = PacketHeader(event_id, PACKET_ID_LIDAR_RESPONSE) # Response packet ID for LiDAR client
+    # packet = Packet(header, png_bytes) # Payload is the PNG image bytes
+
+    # print(f"[LIDAR CLIENT] Heatmap ready ({len(png_bytes)} bytes)")
+
+    result = generate_heatmap_png(json_file_path, camera_data)
+    if result is None:
         print("[LIDAR CLIENT] No bees detected. Sending empty payload.")
         png_bytes = b""
+        detection_json = json.dumps({"pollinator_detected": False}).encode("utf-8")
+    else:
+        png_bytes, detection_json = result
+    
+    # Save the detection JSON locally
+    detection_dir = "detection_results"
+    os.makedirs(detection_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
+    detection_path = os.path.join(detection_dir, f"detection_{event_id}_{timestamp}.json")
+    with open(detection_path, "wb") as f:
+        f.write(detection_json)
+    print(f"[LIDAR CLIENT] Detection JSON saved: {detection_path}")
 
-    header = PacketHeader(event_id, PACKET_ID_LIDAR_RESPONSE) # Response packet ID for LiDAR client
-    packet = Packet(header, png_bytes) # Payload is the PNG image bytes
+    # Payload = [4-byte PNG length][PNG bytes][JSON bytes]
+    png_len = struct.pack(">I", len(png_bytes))   # 4-byte big-endian unsigned int
+    combined_payload = png_len + png_bytes + detection_json
 
-    print(f"[LIDAR CLIENT] Heatmap ready ({len(png_bytes)} bytes)")
+    header = PacketHeader(event_id, PACKET_ID_LIDAR_RESPONSE)
+    packet = Packet(header, combined_payload)
+    print(f"[LIDAR CLIENT] Heatmap ready ({len(png_bytes)} bytes PNG + {len(detection_json)} bytes JSON)")
+    
     print("[LIDAR CLIENT] Sending 2025 response to server")
 
     return packet

@@ -2,7 +2,7 @@ require('dotenv').config();
 const { exec } = require('child_process');
 
 function initTailscale() {
-    if (!process.env.TAILSCALE_AUTHKEY) {
+    if (!process.env.TAILSCALE_AUTH_KEY) {
         console.log('⚠️ No Tailscale auth key, skipping...');
         return;
     }

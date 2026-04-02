@@ -1,37 +1,5 @@
 require('dotenv').config();
 const { exec } = require('child_process');
-
-function initTailscale() {
-    const authKey = process.env.TAILSCALE_AUTH_KEY;
-    if (!authKey) {
-        console.log('⚠️ No Tailscale auth key, skipping...');
-        return;
-    }
-    
-    const { spawn } = require('child_process');
-    
-    // Start tailscaled as a background process
-    const daemon = spawn('./tailscaled', ['--state=/tmp/tailscaled.state', '--socket=/tmp/tailscaled.sock'], {
-        detached: true,
-        stdio: 'ignore'
-    });
-    daemon.unref();
-    
-    // Wait longer for daemon to start
-    setTimeout(() => {
-        exec('./tailscale --socket=/tmp/tailscaled.sock up --authkey=' + authKey + ' --accept-routes', (err) => {
-            if (err) {
-                console.error('❌ Tailscale error:', err.message);
-                return;
-            }
-            console.log('✅ Tailscale connected');
-        });
-    }, 5000);
-}
-
-initTailscale();
-
-initTailscale();
 const net = require('net');
 const fs = require('fs');
 const path = require('path');

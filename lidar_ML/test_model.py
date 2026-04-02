@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from bee_classifier import BeeClassifier
 
-DATASET_PATH = "new_test_dataset"
+DATASET_PATH = "test_dataset"
 MODEL_PATH = "models/bee_model2.pkl"
 
 classifier = BeeClassifier(MODEL_PATH)

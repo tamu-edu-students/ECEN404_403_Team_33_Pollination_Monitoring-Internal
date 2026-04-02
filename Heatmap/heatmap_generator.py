@@ -18,7 +18,7 @@ ANGLE_INCREMENT_DEG = 0.5
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
-MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model.pkl")
+MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model2.pkl")
 
 # Instantiate the classifier
 classifier = BeeClassifier(MODEL_PATH)
@@ -26,8 +26,8 @@ classifier = BeeClassifier(MODEL_PATH)
 # ==========================================
 # GLOBAL STORAGE FOR ACCUMULATED VISITS
 # ==========================================
-flower_visit_counts = {}
-FLOWER_MATCH_THRESHOLD = 0.15  # meters
+flower_visit_counts = {}  # flower_id (str) -> {count, x, y}  OR  (x,y) tuple -> count
+FLOWER_MATCH_THRESHOLD = 0.05  # meters
 
 # ==========================================
 # HELPERS
@@ -41,12 +41,15 @@ def polar_to_xy(distance_m, angle_index):
 
 def find_existing_flower(x, y):
     """
-    Check if this detection is near an existing flower.
+    Check if this detection is near an existing flower (fallback position-based matching).
+    Only applies when flower_id is None.
     """
-    for (fx, fy) in flower_visit_counts.keys():
-        dist = math.sqrt((x - fx) ** 2 + (y - fy) ** 2)
-        if dist < FLOWER_MATCH_THRESHOLD:
-            return (fx, fy)
+    for key in flower_visit_counts.keys():
+        if isinstance(key, tuple):
+            fx, fy = key
+            dist = math.sqrt((x - fx) ** 2 + (y - fy) ** 2)
+            if dist < FLOWER_MATCH_THRESHOLD:
+                return key
     return None
 
 def is_daytime():
@@ -56,7 +59,7 @@ def is_daytime():
 # ==========================================
 # PROCESS FILE
 # ==========================================
-def process_file(filepath, camera_data=None):
+def process_file(filepath, camera_data=None, flower_id=None):
     new_positions = []
     if not os.path.exists(filepath):
         return new_positions
@@ -69,15 +72,19 @@ def process_file(filepath, camera_data=None):
     else:
         print("[FUSION MODE] NIGHT → LiDAR Only")
 
-    print(f"{'EVENT_ID':<15} {'SOURCE':<12} {'PREDICTION':<12} {'CONFIDENCE':<10} {'STATUS'}")
-    print("-" * 70)
+    print(f"{'EVENT_ID':<15} {'FLOWER_ID':<15} {'SOURCE':<12} {'PREDICTION':<20} {'CONFIDENCE':<12} {'STATUS'}")
+    print("-" * 90)
         
     with open(filepath, "r") as f:
         for line in f:
             if not line.strip(): 
                 continue
 
-            event = json.loads(line)
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as e:
+                print(f"[ERROR] Skipping malformed JSON line: {e}")
+                continue
 
             # Predict returns (label, lidar_conf)
             try:
@@ -103,14 +110,14 @@ def process_file(filepath, camera_data=None):
             # ======================================
             # LOG BOTH SOURCES
             # ======================================
-            print(f"{str(event_id):<15} {'LIDAR':<10} "
-                  f"{'pollinator' if lidar_is_bee else 'not_pollinator':<18} "
-                  f"{lidar_conf:0.3f}          -")
+            print(f"{str(event_id):<15} {str(flower_id):<15} {'LIDAR':<12} "
+                  f"{'pollinator' if lidar_is_bee else 'not_pollinator':<20} "
+                  f"{lidar_conf:.3f}            -")
 
             if camera_data:
-                print(f"{str(event_id):<15} {'CAMERA':<10} "
-                      f"{'pollinator' if camera_is_bee else 'not_pollinator':<18} "
-                      f"{camera_conf:0.3f}          -")
+                print(f"{str(event_id):<15} {str(flower_id):<15} {'CAMERA':<12} "
+                      f"{'pollinator' if camera_is_bee else 'not_pollinator':<20} "
+                      f"{camera_conf:.3f}            -")
                             
             # ======================================
             # FUSION LOGIC
@@ -131,11 +138,11 @@ def process_file(filepath, camera_data=None):
 
             status = "DETECTED" if is_bee else "SKIPPED"
 
-            print(f"{str(event_id):<15} {source:<10} "
-                  f"{'pollinator' if is_bee else 'not_pollinator':<18} "
-                  f"{final_conf:0.3f}          {status}")
+            print(f"{str(event_id):<15} {str(flower_id):<15} {source:<12} "
+                  f"{'pollinator' if is_bee else 'not_pollinator':<20} "
+                  f"{final_conf:.3f}            {status}")
 
-            print("-" * 70)
+            print("-" * 90)
 
             if not is_bee:
                 continue
@@ -143,10 +150,10 @@ def process_file(filepath, camera_data=None):
             # ======================================
             # POSITION COMPUTATION
             # ======================================
-            angles = event["angles"]
-            distance_series = event["distance_series"]
+            angles = event.get("angles")
+            distance_series = event.get("distance_series")
             if not angles or not distance_series:
-                print("[WARNING] Missing angles or distance_series")
+                print("[WARNING] Missing angles or distance_series -- skipping event")
                 continue
 
             avg_distances = np.mean(distance_series, axis=0)
@@ -159,26 +166,39 @@ def process_file(filepath, camera_data=None):
                 xs.append(x)
                 ys.append(y)
 
-            new_positions.append((np.mean(xs), np.mean(ys)))
-    
+            if xs and ys:
+                new_positions.append((np.mean(xs), np.mean(ys)))
+
     return new_positions
 
 # ==========================================
 # MAIN HEATMAP GENERATOR
 # ==========================================
-def generate_heatmap_png(filepath, camera_data=None):
+def generate_heatmap_png(filepath, camera_data=None, flower_id=None):
 
-    new_positions = process_file(filepath, camera_data)
+    new_positions = process_file(filepath, camera_data, flower_id)
 
     # ==========================================
     # UPDATE GLOBAL FLOWER COUNTS
     # ==========================================
     for x, y in new_positions:
-        existing = find_existing_flower(x, y)
-        if existing:
-            flower_visit_counts[existing] += 1
+        if flower_id is not None:
+            # --- flower_id string key ---
+            if flower_id in flower_visit_counts:
+                flower_visit_counts[flower_id]["count"] += 1
+            else:
+                flower_visit_counts[flower_id] = {
+                    "count": 1,
+                    "x": x,
+                    "y": y
+                }
         else:
-            flower_visit_counts[(x, y)] = 1
+            # --- fallback: position-based (x,y) tuple key ---
+            existing = find_existing_flower(x, y)
+            if existing:
+                flower_visit_counts[existing] += 1
+            else:
+                flower_visit_counts[(x, y)] = 1
 
     # if len(flower_visit_counts) == 0:
     #     return None
@@ -186,18 +206,31 @@ def generate_heatmap_png(filepath, camera_data=None):
     detection_json_bytes = json.dumps({"pollinator_detected": pollinator_detected}).encode("utf-8")
 
     if len(flower_visit_counts) == 0:
+        print("[HEATMAP] No flowers tracked yet — skipping heatmap generation.")
         return None, detection_json_bytes
     
+    # ==========================================
+    # BUILD PLOT DATA — FIXED: single unified loop
+    # ==========================================
     xs = []
     ys = []
     counts = []
 
-    for (x, y), count in flower_visit_counts.items():
-        xs.append(x)
-        ys.append(y)
-        counts.append(count)
+    for key, data in flower_visit_counts.items():
+        if isinstance(key, str):        # flower_id case
+            xs.append(data["x"])
+            ys.append(data["y"])
+            counts.append(data["count"])
+        else:                           # fallback (x, y) tuple case
+            xs.append(key[0])
+            ys.append(key[1])
+            counts.append(data)
 
     total_visits = sum(counts)
+
+    # ==========================================
+    # PLOT
+    # ==========================================
     fig, ax = plt.subplots(figsize=(8, 8))
 
     ax.set_facecolor("#f8fafc")
@@ -219,7 +252,20 @@ def generate_heatmap_png(filepath, camera_data=None):
     ax.spines["right"].set_visible(False)
     ax.set_xlabel("Distance X (m)")
     ax.set_ylabel("Distance Y (m)")
-    ax.set_title(f"Pollinator Activity Map\nTotal Visits: {total_visits}")
+
+    # Build per-flower summary for title
+    flower_summary_lines = []
+    for key, data in flower_visit_counts.items():
+        if isinstance(key, str):
+            flower_summary_lines.append(f"{key}: {data['count']}")
+        else:
+            flower_summary_lines.append(f"({key[0]:.2f}, {key[1]:.2f}): {data}")
+ 
+    title_text = f"Pollinator Activity Map\nTotal Visits: {total_visits}"
+    if flower_summary_lines:
+        title_text += "\n\nVisits per Flower:\n" + "\n".join(flower_summary_lines)
+ 
+    ax.set_title(title_text)
     ax.set_aspect("equal", adjustable="box")
 
     padding = 0.2
@@ -242,6 +288,14 @@ def generate_heatmap_png(filepath, camera_data=None):
 
     print(f"[HEATMAP] Saved locally: {file_path}")
     print(f"[HEATMAP] Total visits so far: {total_visits}")
+
+    # Print per-flower breakdown
+    print("[HEATMAP] Visits per flower:")
+    for key, data in flower_visit_counts.items():
+        if isinstance(key, str):
+            print(f"  - {key:<10} → {data['count']} visits")
+        else:
+            print(f"  - ({key[0]:.2f}, {key[1]:.2f}) → {data} visits")
 
     # ==========================================
     # ALSO RETURN PNG BYTES FOR NETWORK

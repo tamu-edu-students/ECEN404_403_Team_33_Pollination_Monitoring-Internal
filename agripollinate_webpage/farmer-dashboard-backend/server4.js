@@ -353,20 +353,36 @@ function handleLidarResponse(packet) {
         if (!fs.existsSync(downloadDir)) {
             fs.mkdirSync(downloadDir);
         }
-        
+
+        const payload = packet.payload;
+
+        // Check if payload has the new structured format (PNG len prefix + JSON)
+        // or is raw PNG (starts with PNG magic bytes 0x89504E47)
+        const isRawPNG = payload[0] === 0x89 && payload[1] === 0x50 &&
+                         payload[2] === 0x4E && payload[3] === 0x47;
+
+        let pngBytes = payload;
+        let pollinatorDetected = null;
+
+        if (!isRawPNG) {
+            // New structured format: [4-byte png_len][png_bytes][json_bytes]
+            const pngLen = payload.readUInt32BE(0);
+            pngBytes = payload.slice(4, 4 + pngLen);
+            const jsonBytes = payload.slice(4 + pngLen);
+            const detectionJson = JSON.parse(jsonBytes.toString('utf-8'));
+            pollinatorDetected = detectionJson.pollinator_detected;
+            console.log(`[IMAGE CLIENT] Pollinator Detected: ${pollinatorDetected}`);
+        }
+
         const filename = `pollinator_activity_map_${packet.header.event_id}.png`;
         const file_path = path.join(downloadDir, filename);
-        
-        fs.writeFileSync(file_path, packet.payload);
-        console.log(`[LIDAR] Saved: ${filename} (${packet.payload.length} bytes)`);
-        
-        // Debug: Check if it's actually a PNG
-        const isPNG = packet.payload.length > 8 && 
-                      packet.payload[0] === 0x89 && 
-                      packet.payload[1] === 0x50 && 
-                      packet.payload[2] === 0x4E && 
-                      packet.payload[3] === 0x47;
+        fs.writeFileSync(file_path, pngBytes);
+        console.log(`[LIDAR] Saved: ${filename} (${pngBytes.length} bytes)`);
+
+        const isPNG = pngBytes[0] === 0x89 && pngBytes[1] === 0x50 &&
+                      pngBytes[2] === 0x4E && pngBytes[3] === 0x47;
         console.log(`[LIDAR] Is valid PNG: ${isPNG}`);
+
     } catch (e) {
         console.error(`Error handling lidar response: ${e}`);
     }

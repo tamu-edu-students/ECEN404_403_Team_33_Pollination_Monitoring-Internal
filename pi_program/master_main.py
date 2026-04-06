@@ -47,19 +47,19 @@ LIDAR_DATA_SAVE_DIR = "/home/josiah/pi_program/lidar_data"
 TRIGGER_SCANS_TO_SAVE = 10  # Number of scans to save per trigger
 
 # Event Detection Configuration
-EVENT_DIST_THRESHOLD = 0.01  # Distance threshold for occupancy detection (meters)
-EVENT_START_CONFIRM_SCANS = 5
-EVENT_END_CONFIRM_SCANS = 5
+EVENT_DIST_THRESHOLD = 0.02  # Distance threshold for occupancy detection (meters)
+EVENT_START_CONFIRM_SCANS = 6
+EVENT_END_CONFIRM_SCANS = 6
 
 # Watchdog Configuration
 WATCHDOG_TIMEOUT = 5.0          # Maximum time between scans before watchdog alert (seconds)
 
 # Connection Timeout Configuration
-CONNECTION_TIMEOUT = 60.0       # Timeout for connection attempts before prompting user (seconds)
+CONNECTION_TIMEOUT = 10.0       # Timeout for connection attempts before prompting user (seconds)
 LIDAR_CLIENT_TIMEOUT = True  # Flag to enable/disable waiting for LiDAR client connection at startup
 
 # File Cleanup Configuration
-MAX_AGE_SECONDS = 1800  # Maximum age of files to keep (30 mins)
+MAX_AGE_SECONDS = 1800  # Maximum age of files to keep (in seconds) (1800s == 30m)
 
 # -------------------------------
 # Global State
@@ -94,6 +94,7 @@ def signal_handler(sig, frame):
 
     try:
         if active_lidar_connection and not testing_mode:
+            active_lidar_connection.end()  # Stop LiDAR streaming before disconnecting
             active_lidar_connection.disconnect()
     except Exception:
         pass
@@ -354,6 +355,13 @@ def main():
             print("[ERROR] Failed to initialize LiDAR connection. Exiting.")
             return
         
+        # Optional automatic flower configuration
+        flower_config = None
+
+        auto_config = input("Would you like to auto-configure flower detection? (y/n): ").lower().strip()
+        if auto_config == 'y' and lidar is not None:
+            flower_config = lidar.setup_flowers()
+
         # 2. Start image server
         print("\n[INIT] Starting image server...")
         image_server = ImageServer(
@@ -366,6 +374,7 @@ def main():
         if not image_server.start_server():
             print("[ERROR] Failed to start image server. Exiting.")
             if not lidar is None:
+                lidar.end()
                 lidar.disconnect()
             return
         
@@ -384,6 +393,7 @@ def main():
             if not lidar_data_server.start_server():
                 print("[ERROR] Failed to start LiDAR data server. Exiting.")
                 if not lidar is None:
+                    lidar.end()
                     lidar.disconnect()
                 image_server.stop_server()
                 return
@@ -400,6 +410,7 @@ def main():
         # 4. Initialize event detector
         print("\n[INIT] Initializing event detector...")
         detector = EventDetector(
+            flowers=flower_config,
             dist_threshold=EVENT_DIST_THRESHOLD,
             start_confirm_scans=EVENT_START_CONFIRM_SCANS,
             end_confirm_scans=EVENT_END_CONFIRM_SCANS
@@ -464,21 +475,23 @@ def main():
                     event_start = {
                         "type": "start",
                         "flower_id": "flower_1",
-                        "start_time": current_time,
-                        "angles": [68, 69, 70, 71]
+                        "start_time": time.time(),
+                        "angles": [125, 126, 127, 128, 129]
                     }
                     on_event_start(event_start, object_count, image_server)
                     
                     # Simulate event end
                     event_end = {
                         "type": "end",
-                        "event_type": "flower_visit",
                         "flower_id": "flower_1",
-                        "start_time": current_time,
-                        "end_time": current_time + 2.0,
-                        "num_scans": 16,
-                        "angles": [68, 69, 70, 71],
-                        "distance_series": [[0.25] * 4 for _ in range(16)]
+                        "background_dist": 0.25,
+                        "start_time": event_start["start_time"],
+                        "end_time": event_start["start_time"] + (1774325482.7165854 - 1774325482.1839502),
+                        "num_scans": 8,
+                        "angles": [125, 126, 127, 128, 129],
+                        "distance_series": [[0.234, 0.216, 0.218, 0.224, 0.253], [0.232, 0.224, 0.227, 0.235, 0.276], [0.232, 0.235, 0.236, 0.241, 0.296], [0.238, 0.243, 0.242, 0.247, 0.298], [0.242, 0.247, 0.245, 0.248, 0.298], [0.243, 0.242, 0.248, 0.248, 0.296], [0.248, 0.241, 0.25, 0.25, 0.292], [0.246, 0.242, 0.25, 0.246, 0.291]],
+                        "timestamp": event_start["start_time"] + (1774325482.7165854 - 1774325482.1839502),
+                        "label": None
                     }
                     on_event_end(event_end, lidar_data_server)
                     print()
@@ -495,6 +508,9 @@ def main():
                     break
         else:
             # Normal mode: process LiDAR scans with event detection
+
+            lidar.start()  # Start LiDAR streaming after all servers are ready
+
             while running:
                 # Get next LiDAR scan
                 scan_data = lidar.get_scan(timeout=1.0, required_indices=required_lidar_indices)
@@ -504,6 +520,7 @@ def main():
                     current_time = time.time()
                     if not watchdog_check(current_time):
                         print("[WATCHDOG] Attempting to reconnect to LiDAR...")
+                        lidar.end() 
                         lidar.disconnect()
                         time.sleep(1)
                         if not lidar.connect():
@@ -566,6 +583,7 @@ def main():
         print("\n[CLEANUP] Closing connections...")
         
         if lidar and not testing_mode:
+            lidar.end()  # Stop LiDAR streaming before disconnecting
             lidar.disconnect()
         elif testing_mode:
             print("[CLEANUP] Testing mode - no LiDAR connection to close")

@@ -187,7 +187,7 @@ class ImageServer:
     def capture_image(self):
         """Capture an image from USB camera using fswebcam"""
         try:
-            '''
+            
             # Create unique filename based on timestamp
             timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
             image_path = os.path.join(self.save_dir, f"captured_{timestamp}.jpg")
@@ -200,15 +200,16 @@ class ImageServer:
                 stderr=subprocess.DEVNULL
             )
             print(f"Image captured: {image_path}")
-            return image_path '''
-
+            return image_path 
+        
+            '''
             self.sample = not self.sample
             
             if (self.sample == True):
                 return 'sample0.jpg'
             else:
                 return 'sample1.jpg'
-            
+            '''
         except subprocess.CalledProcessError:
             print("Failed to capture image")
             return None

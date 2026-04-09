@@ -21,10 +21,10 @@ class BeeClassifier:
 
         if duration > 5.0:
             print(f"[PRE-FILTER] Rejected: duration={duration:.2f}s > 5.0s")
-            return "not_bee", 0.0
+            return "not_bee", 0.309
         if num_scans > 100:
             print(f"[PRE-FILTER] Rejected: num_scans={num_scans} > 100")
-            return "not_bee", 0.0
+            return "not_bee", 0.309
         # if max_intrusion < 0.02:
         #     print(f"[PRE-FILTER] Rejected: max_intrusion={max_intrusion:.4f}m < 0.02m")
         #     return "not_bee", 0.0

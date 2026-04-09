@@ -1,0 +1,55 @@
+{
+  "flower_1": {
+    "angle_indices": [
+      72,
+      73,
+      74,
+      75
+    ],
+    "background_dist": 0.0
+  },
+  "flower_2": {
+    "angle_indices": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112
+    ],
+    "background_dist": 0.244
+  },
+  "flower_3": {
+    "angle_indices": [
+      219,
+      220,
+      221
+    ],
+    "background_dist": 0.243
+  },
+  "flower_4": {
+    "angle_indices": [
+      87,
+      88,
+      89,
+      90,
+      91,
+      92
+    ],
+    "background_dist": 0.0
+  },
+  "flower_5": {
+    "angle_indices": [
+      65,
+      66,
+      67
+    ],
+    "background_dist": 0.0
+  }
+}

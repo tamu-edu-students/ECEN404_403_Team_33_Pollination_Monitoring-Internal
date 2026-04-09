@@ -1,8 +1,8 @@
 import os
 import json
 
-RAW_FOLDER = "raw_dataset"
-LABELED_FOLDER = "new_labeled_dataset"
+RAW_FOLDER = "dataset/raw_dataset"
+LABELED_FOLDER = "dataset/new_labeled_dataset"
 
 os.makedirs(LABELED_FOLDER, exist_ok=True)
 

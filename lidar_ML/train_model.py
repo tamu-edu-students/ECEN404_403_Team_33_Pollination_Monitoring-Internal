@@ -12,8 +12,8 @@ from sklearn.utils import shuffle
 
 from feature_extractor import extract_features
 
-DATASET_PATH = "new_labeled_dataset"
-MODEL_PATH = "models/bee_model3.pkl"
+DATASET_PATH = "dataset/new_labeled_dataset"
+MODEL_PATH = "models/bee_model4.pkl"
 
 def load_dataset():
     """

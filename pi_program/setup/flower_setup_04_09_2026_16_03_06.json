@@ -1,0 +1,79 @@
+{
+  "flower_1": {
+    "angle_indices": [
+      45,
+      46,
+      47,
+      48
+    ],
+    "background_dist": 0.33
+  },
+  "flower_2": {
+    "angle_indices": [
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      62,
+      63,
+      64
+    ],
+    "background_dist": 0.0
+  },
+  "flower_3": {
+    "angle_indices": [
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127
+    ],
+    "background_dist": 0.358
+  },
+  "flower_4": {
+    "angle_indices": [
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189
+    ],
+    "background_dist": 0.165
+  },
+  "flower_5": {
+    "angle_indices": [
+      219,
+      220,
+      221
+    ],
+    "background_dist": 0.283
+  },
+  "flower_6": {
+    "angle_indices": [
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76
+    ],
+    "background_dist": 0.0
+  }
+}

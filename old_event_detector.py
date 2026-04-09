@@ -19,12 +19,12 @@ CMD_STOP = b"\x02sEN LMDscandata 0\x03"
 
 FLOWERS = {
     "flower_1": {
-        "angle_indices": [119, 120, 121, 122, 123, 124, 125, 126],
-        "background_dist": 0.31
+        "angle_indices": [76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88],
+        "background_dist": 0.20
     },
     "flower_2": {
-        "angle_indices": [153, 154, 155, 156, 157, 158],
-        "background_dist": 0.30
+        "angle_indices": [163, 164, 165, 166, 167, 168, 169, 170],
+        "background_dist": 0.31
     }
 
 }
@@ -53,7 +53,7 @@ def parse_scan(telegram):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    raw_dataset_folder = os.path.join(script_dir, "lidar_ML", "raw_dataset")
+    raw_dataset_folder = os.path.join(script_dir, "lidar_ML/dataset", "raw_dataset")
     os.makedirs(raw_dataset_folder, exist_ok=True)
 
     flower_state = {

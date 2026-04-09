@@ -18,7 +18,7 @@ ANGLE_INCREMENT_DEG = 0.5
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
-MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model2.pkl")
+MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model3.pkl")
 
 # Instantiate the classifier
 classifier = BeeClassifier(MODEL_PATH)

@@ -137,7 +137,6 @@ def train():
         "intrusion_std", 
         "intrusion_ratio", 
         "temporal_variation", 
-        "spatial_spread"
     ]
 
     importances = model.feature_importances_

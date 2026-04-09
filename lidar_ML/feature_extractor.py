@@ -94,14 +94,6 @@ def extract_features(event):
         if len(scan_means) > 1 else 0
     )
 
-    # -----------------------------
-    # NEW FEATURE 3
-    # spatial_spread
-    # Number of LiDAR angles involved in the event
-    # Larger objects cover more angles
-    # -----------------------------
-    spatial_spread = len(event["angles"])
-
     # Return all features as a list for CSV writing
     return [
     event.get("event_id", "unknown"),
@@ -117,7 +109,6 @@ def extract_features(event):
     intrusion_std,
     intrusion_ratio,
     temporal_variation,
-    spatial_spread,
     event.get("label", None)   # ✅ safe
 ]
 
@@ -149,7 +140,6 @@ def main():
             "intrusion_std",
             "intrusion_ratio",
             "temporal_variation",
-            "spatial_spread",
             "label"
         ])
 

@@ -13,12 +13,27 @@ class BeeClassifier:
         self.threshold = threshold
 
     def predict(self, event):
+        duration = event.get("end_time", 0) - event.get("start_time", 0)
+        num_scans = event.get("num_scans", 0)
+        background = event.get("background_dist", 1.0)
+        all_distances = [d for scan in event["distance_series"] for d in scan]
+        max_intrusion = background - min(all_distances)
+
+        if duration > 5.0:
+            print(f"[PRE-FILTER] Rejected: duration={duration:.2f}s > 5.0s")
+            return "not_bee", 0.0
+        if num_scans > 100:
+            print(f"[PRE-FILTER] Rejected: num_scans={num_scans} > 100")
+            return "not_bee", 0.0
+        # if max_intrusion < 0.02:
+        #     print(f"[PRE-FILTER] Rejected: max_intrusion={max_intrusion:.4f}m < 0.02m")
+        #     return "not_bee", 0.0
+    
         # extract features from event
         features = extract_features(event)
 
-        # remove event_id and label
-        # numeric_features = features[1:-1]
-        numeric_features = features[1:14] 
+        # remove non-numeric fields (Index 0 is event_id, Index -1 is label)
+        numeric_features = features[1:-1]
 
         # model expects 2D input
         lidar_conf = self.model.predict_proba([numeric_features])[0][1]

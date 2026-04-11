@@ -8,12 +8,32 @@ import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.utils import shuffle
 
 from feature_extractor import extract_features
 
-DATASET_PATH = "dataset/new_labeled_dataset"
+DATASET_PATH = "dataset/deduped_dataset" # "new_labeled_dataset"
 MODEL_PATH = "models/bee_model4.pkl"
+
+# Must match extract_features() return list indices 1:-1 exactly
+FEATURE_NAMES = [
+    "duration",
+    "num_scans",
+    "scans_per_second",
+    "min_distance",
+    "max_distance",
+    "mean_distance",
+    "std_distance",
+    "max_intrusion",
+    "mean_intrusion",
+    "intrusion_std",
+    "intrusion_ratio",
+    "temporal_variation",
+    "intrusion_consistency",
+    "movement_during_visit",
+    "peak_intrusion_timing",
+]
 
 def load_dataset():
     """
@@ -32,7 +52,6 @@ def load_dataset():
             continue
 
         filepath = os.path.join(DATASET_PATH, filename)
-
         with open(filepath, "r") as f:
             event = json.load(f)
 
@@ -47,15 +66,9 @@ def load_dataset():
         numeric_features = features[1:-1]
 
         X.append(numeric_features)
-
-        # convert label to number
-        if event["label"] == "bee":
-            y.append(1)
-        else:
-            y.append(0)
+        y.append(1 if event["label"] == "bee" else 0) # convert label to number
 
     return np.array(X), np.array(y)
-
 
 def train():
 
@@ -66,124 +79,134 @@ def train():
 
     if len(X) == 0:
         print("No data found to train on. Check your labeled_dataset folder.")
-        return
+        return  
     
+    # dataset overview
+    print(f"Dataset folder: {DATASET_PATH}")
     print("Dataset size:", len(X))
     print("Bee samples:", sum(y))
     print("Not bee samples:", len(y) - sum(y))
+
+    # =========================================================
+    # CROSS-VALIDATION — honest performance estimate
+    # Do this BEFORE fitting on full data.
+    # =========================================================
+    X_s, y_s = shuffle(X, y, random_state=42)
+ 
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    # =========================================================
-    # FEATURE SCATTER PLOT
-    # =========================================================
-    # Using the two most important features discovered earlier
-    mean_intrusion_idx = 8
-    mean_distance_idx = 5
-
-    bee_x = []
-    bee_y = []
-
-    notbee_x = []
-    notbee_y = []
-
-    for i in range(len(X)):
-
-        if y[i] == 1:
-            bee_x.append(X[i][mean_distance_idx])
-            bee_y.append(X[i][mean_intrusion_idx])
-        else:
-            notbee_x.append(X[i][mean_distance_idx])
-            notbee_y.append(X[i][mean_intrusion_idx])
-
-    plt.figure(figsize=(8,6))
-    plt.scatter(bee_x, bee_y, label="bee", alpha=0.7)
-    plt.scatter(notbee_x, notbee_y, label="not_bee", alpha=0.7)
-    plt.xlabel("mean_distance")
-    plt.ylabel("mean_intrusion")
-    plt.title("Feature Separation: Bee vs Not Bee")
-    plt.legend()
-    plt.savefig("features/feature_scatter.png")
-    print("[SUCCESS] Feature scatter plot saved as 'features/feature_scatter.png'")
-    plt.show()
+    # 1. Define the model FIRST (this serves as the template for CV)
+    model_cv = RandomForestClassifier(
+        n_estimators=100,
+        class_weight="balanced",
+        random_state=42
+    )
+    
+    # 2. Pass model_cv as the first argument
+    cv_f1  = cross_val_score(model_cv, X_s, y_s, cv=cv, scoring="f1")
+    cv_acc = cross_val_score(model_cv, X_s, y_s, cv=cv, scoring="accuracy")
+ 
+    print("\n" + "=" * 50)
+    print("CROSS-VALIDATION RESULTS (honest performance)")
+    print("=" * 50)
+    print(f"  F1  per fold:  {[f'{s:.3f}' for s in cv_f1]}")
+    print(f"  F1  mean ± std: {cv_f1.mean():.3f} ± {cv_f1.std():.3f}")
+    print(f"  Acc per fold:  {[f'{s:.3f}' for s in cv_acc]}")
+    print(f"  Acc mean ± std: {cv_acc.mean():.3f} ± {cv_acc.std():.3f}")
+ 
+    if cv_f1.mean() >= 0.90:
+        print("  ✅ Model looks solid. Deploy with confidence.")
+    elif cv_f1.mean() >= 0.80:
+        print("  ⚠️  Acceptable but collect more diverse data.")
+    else:
+        print("  ❌ Low performance. More data and feature work needed.")
+    print("=" * 50)
 
     # =========================================================
-    # MODEL TRAINING
+    # TRAIN FINAL MODEL ON FULL DATASET
     # =========================================================
-    # Shuffle to ensure the model doesn't learn based on file order
-    X, y = shuffle(X, y, random_state=42)
-
-    # Initialize and train the Random Forest
     model = RandomForestClassifier(
         n_estimators=100,
         class_weight="balanced",
         random_state=42
     )
-
-    model.fit(X, y)
+    model.fit(X_s, y_s)
 
     # =========================================================
-    # FEATURE IMPORTANCE ANALYSIS
+    # FEATURE IMPORTANCE
     # =========================================================
-    # This list MUST match the order of features[1:-1] in extract_features()
-    feature_names = [
-        "duration", 
-        "num_scans", 
-        "scans_per_second", 
-        "min_distance", 
-        "max_distance", 
-        "mean_distance", 
-        "std_distance", 
-        "max_intrusion", 
-        "mean_intrusion", 
-        "intrusion_std", 
-        "intrusion_ratio", 
-        "temporal_variation", 
-    ]
-
     importances = model.feature_importances_
-    indices = np.argsort(importances)[::-1]  # Sort from highest importance to lowest
-
-    # =========================================================
-    # TERMINAL VISUALIZATION
-    # =========================================================
-    print("\n" + "="*30)
+    indices     = np.argsort(importances)[::-1]
+ 
+    print("\n" + "=" * 30)
     print("FEATURE IMPORTANCE LOG")
-    print("="*30)
+    print("=" * 30)
     for i in indices:
-        name = feature_names[i]
+        name  = FEATURE_NAMES[i]
         score = importances[i]
-        # Create a simple text-based bar for quick visual reference
-        bar = "█" * int(score * 50) 
-        print(f"{name:<20} | {score:.4f} {bar}")
-    print("="*30 + "\n")
-
-    # =========================================================
-    # MATPLOTLIB VISUALIZATION
-    # =========================================================
+        bar   = "█" * int(score * 50)
+        print(f"{name:<25} | {score:.4f} {bar}")
+    print("=" * 30 + "\n")
+ 
     plt.figure(figsize=(12, 7))
     plt.title("LiDAR Feature Importance for Bee Detection (SICKSense)")
-    plt.bar(range(len(importances)), importances[indices], color='forestgreen', align="center")
-    plt.xticks(range(len(importances)), [feature_names[i] for i in indices], rotation=45, ha='right') # Label the X-axis with the feature names
+    plt.bar(range(len(importances)), importances[indices], color="forestgreen", align="center")
+    plt.xticks(range(len(importances)), [FEATURE_NAMES[i] for i in indices], rotation=45, ha="right")
     plt.ylabel("Relative Importance Score")
     plt.xlabel("LiDAR Signal Features")
     plt.tight_layout()
     plt.savefig("features/feature_importance.png")
-    print("\n[SUCCESS] Feature importance graph saved as 'features/feature_importance.png'")
+    print("[SUCCESS] Feature importance graph saved as 'features/feature_importance.png'")
     plt.show()
 
     # =========================================================
-    # TRAINING PERFORMANCE
+    # FEATURE SCATTER PLOT
+    # Uses the two highest-importance features from last run.
+    # Update indices here if importance ranking changes.
+    # mean_intrusion = index 8, mean_distance = index 5
     # =========================================================
-    # Evaluate on the training set
-    preds = model.predict(X)
+    # Re-calculate indices based on the trained model's importances
+    importances = model.feature_importances_
+    top_two_indices = np.argsort(importances)[-2:] # Get indices of two highest scores
+    
+    idx_y = top_two_indices[-1] # Most important
+    idx_x = top_two_indices[-2] # Second most important
 
-    print("\nTraining Performance")
-    print(classification_report(y, preds))
+    plt.figure(figsize=(8, 6))
 
+    # Filter data for plotting
+    for label, color, name in [(1, "tab:blue", "bee"), (0, "tab:orange", "not_bee")]:
+        mask = (y_s == label)
+        plt.scatter(
+            X_s[mask, idx_x], 
+            X_s[mask, idx_y], 
+            label=name, 
+            alpha=0.6, 
+            edgecolors='w'
+        )
+    
+    plt.xlabel(FEATURE_NAMES[idx_x])
+    plt.ylabel(FEATURE_NAMES[idx_y])
+    plt.title(f"Top 2 Features: {FEATURE_NAMES[idx_y]} vs {FEATURE_NAMES[idx_x]}")
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.savefig("features/new_feature_scatter.png")
+    print(f"[SUCCESS] Scatter plot updated using {FEATURE_NAMES[idx_y]} and {FEATURE_NAMES[idx_x]}")
+    plt.show()
+    
+    # =========================================================
+    # TRAINING PERFORMANCE (sanity check — should be ~100%)
+    # =========================================================
+    preds = model.predict(X_s)
+    print("\nTraining Performance (on full dataset — expect ~100%)")
+    print(classification_report(y_s, preds))
+ 
     # =========================================================
     # SAVE MODEL
-    # =========================================================    
+    # =========================================================
     joblib.dump(model, MODEL_PATH)
     print("Model saved to:", MODEL_PATH)
-
+ 
+ 
 if __name__ == "__main__":
     train()

@@ -19,14 +19,13 @@ CMD_STOP = b"\x02sEN LMDscandata 0\x03"
 
 FLOWERS = {
     "flower_1": {
-        "angle_indices": [76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88],
-        "background_dist": 0.20
+        "angle_indices": [125, 126, 127, 128, 129, 130, 131, 132],
+        "background_dist": 0.35
     },
     "flower_2": {
-        "angle_indices": [163, 164, 165, 166, 167, 168, 169, 170],
-        "background_dist": 0.31
+        "angle_indices": [170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183],
+        "background_dist": 0.22
     }
-
 }
 
 DIST_THRESHOLD = 0.035

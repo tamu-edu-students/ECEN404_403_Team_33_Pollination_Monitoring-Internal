@@ -2,7 +2,7 @@ import os
 import json
 
 RAW_FOLDER = "dataset/raw_dataset"
-LABELED_FOLDER = "dataset/new_labeled_dataset"
+LABELED_FOLDER = "dataset/test_dataset"
 
 os.makedirs(LABELED_FOLDER, exist_ok=True)
 

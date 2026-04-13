@@ -18,7 +18,7 @@ ANGLE_INCREMENT_DEG = 0.5
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(BASE_DIR)
 
-MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model2.pkl")
+MODEL_PATH = os.path.join(PARENT_DIR, 'lidar_ML', 'models', "bee_model4.pkl")
 
 # Instantiate the classifier
 classifier = BeeClassifier(MODEL_PATH)
@@ -239,10 +239,6 @@ def generate_heatmap_png(filepath, camera_data=None, flower_id=None):
 
         buffer.seek(0)
         return buffer.read(), detection_json_bytes
-
-    # if len(flower_visit_counts) == 0:
-    #     print("[HEATMAP] No flowers tracked yet — skipping heatmap generation.")
-    #     return None, detection_json_bytes
     
     # ==========================================
     # BUILD PLOT DATA — FIXED: single unified loop
@@ -293,9 +289,9 @@ def generate_heatmap_png(filepath, camera_data=None, flower_id=None):
 
     for key, data in flower_visit_counts.items():
         if isinstance(key, str):
-            flower_summary_parts.append(f"{key} ({data['count']})")
+            flower_summary_parts.append(f"{key} - {data['count']}")
         else:
-            flower_summary_parts.append(f"({key[0]:.2f},{key[1]:.2f}) ({data})")
+            flower_summary_parts.append(f"({key[0]:.2f},{key[1]:.2f}) - {data}")
 
     summary_line = " | ".join(flower_summary_parts)
 
@@ -303,22 +299,9 @@ def generate_heatmap_png(filepath, camera_data=None, flower_id=None):
     title_text = "Pollinator Activity Map"
 
     if summary_line:
-        title_text += f"\nTotal Visits: {total_visits} {summary_line}"
+        title_text += f"\nTotal Visits:- {total_visits} || {summary_line}"
 
     ax.set_title(title_text)
-
-    # flower_summary_lines = []
-    # for key, data in flower_visit_counts.items():
-    #     if isinstance(key, str):
-    #         flower_summary_lines.append(f"{key}: {data['count']}")
-    #     else:
-    #         flower_summary_lines.append(f"({key[0]:.2f}, {key[1]:.2f}): {data}")
- 
-    # title_text = f"Pollinator Activity Map\nTotal Visits: {total_visits}"
-    # if flower_summary_lines:
-    #     title_text += "\n\nVisits per Flower:\n" + "\n".join(flower_summary_lines)
- 
-    # ax.set_title(title_text)
     ax.set_aspect("equal", adjustable="box")
 
     padding = 0.2

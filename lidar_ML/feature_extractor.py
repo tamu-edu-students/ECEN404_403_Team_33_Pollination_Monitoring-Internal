@@ -13,10 +13,6 @@ FEATURE_FOLDER = "features"
 # Output CSV file
 OUTPUT_FILE = os.path.join(FEATURE_FOLDER, "features.csv")
 
-# Create features folder if it does not exist
-os.makedirs(FEATURE_FOLDER, exist_ok=True)
-
-
 def extract_features(event):
     """
     Extract numerical ML features from a single event JSON.
@@ -148,6 +144,9 @@ def main():
     Loop through labeled JSON events and extract features
     into a single CSV dataset for ML training.
     """
+
+    # Create features folder if it does not exist
+    os.makedirs(FEATURE_FOLDER, exist_ok=True)
 
     # Only process JSON files
     files = sorted(f for f in os.listdir(LABELED_FOLDER) if f.endswith(".json"))

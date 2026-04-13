@@ -19,7 +19,6 @@ class BeeClassifier:
         num_scans = event.get("num_scans", 0)
         background = event.get("background_dist", 1.0)
         all_distances = [d for scan in event["distance_series"] for d in scan]
-        max_intrusion = background - min(all_distances)
 
         # After — give a small buffer above your longest bee event (8.87s)
         # if duration > 10.0:
@@ -34,7 +33,6 @@ class BeeClassifier:
 
         # remove non-numeric fields (Index 0 is event_id, Index -1 is label)
         numeric_features = features[1:16]   # indices 1–15, drop event_id (0) and label (16)
-        # numeric_features = features[1:-1]
 
         # model expects 2D input
         lidar_conf = self.model.predict_proba([numeric_features])[0][1]

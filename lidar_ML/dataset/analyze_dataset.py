@@ -15,13 +15,11 @@ DATASET_PATH = "deduped_dataset" # "new_labeled_dataset"
 SESSION_TARGETS = {
     "A": ("bee",     1.0,  4.0, "fast drop + vibrate, 1-4s"),
     "B": ("bee",     4.0,  8.0, "fast drop + vibrate, 4-8s"),
-    "C": ("bee",     4.0,  8.0, "drop + hold still, 2-5s"),
-    "D": ("bee",     4.0,  8.0, "drop + hold still, 5-8s"),
-    "E": ("not_bee", 2.0,  6.0, "still hold SHORT, 2-6s"),
-    "F": ("not_bee", 8.0, 15.0, "still hold, 8-15s"),
-    "G": ("not_bee",15.0, 25.0, "still hold, 15-25s"),
+    "C": ("not_bee", 2.0,  6.0, "still hold SHORT, 2-6s"),
+    "D": ("not_bee", 8.0, 15.0, "still hold, 8-15s"),
+    "E": ("not_bee",15.0, 25.0, "still hold, 15-25s"),
 }
-SESSION_TARGET_COUNTS = {"A": 60, "B": 40, "C": 25, "D": 20, "E": 50, "F": 40, "G": 20}
+SESSION_TARGET_COUNTS = {"A": 60, "B": 40, "C": 50, "D": 40, "E": 20}
 
 
 # ============================================================

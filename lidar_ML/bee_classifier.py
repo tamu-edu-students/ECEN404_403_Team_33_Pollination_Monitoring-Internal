@@ -22,12 +22,12 @@ class BeeClassifier:
         max_intrusion = background - min(all_distances)
 
         # After — give a small buffer above your longest bee event (8.87s)
-        if duration > 10.0:
-            print(f"[PRE-FILTER] Rejected: duration={duration:.2f}s > 10.0s")
-            return "not_bee", 0.0
-        if num_scans > 150:
-            print(f"[PRE-FILTER] Rejected: num_scans={num_scans} > 150")
-            return "not_bee", 0.0
+        # if duration > 10.0:
+        #     print(f"[PRE-FILTER] Rejected: duration={duration:.2f}s > 10.0s")
+        #     return "not_bee", 0.0
+        # if num_scans > 150:
+        #     print(f"[PRE-FILTER] Rejected: num_scans={num_scans} > 150")
+        #     return "not_bee", 0.0
     
         # extract features from event
         features = extract_features(event)

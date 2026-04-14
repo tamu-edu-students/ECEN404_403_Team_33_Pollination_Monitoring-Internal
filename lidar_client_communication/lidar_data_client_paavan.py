@@ -336,7 +336,7 @@ def main():
 
                 client_socket.sendall(response_packet.serialize())
                 print(f"[LIDAR CLIENT] Sent 2025 response for event {event_id}")
-                print("=" * 90 + "\n")
+                print("=" * 115 + "\n")
 
                 pending_files.pop(event_id, None)
                 camera_results.pop(event_id, None)

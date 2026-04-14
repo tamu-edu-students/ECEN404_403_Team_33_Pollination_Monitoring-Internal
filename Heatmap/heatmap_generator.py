@@ -54,7 +54,7 @@ def find_existing_flower(x, y):
 
 def is_daytime():
     hour = datetime.now().hour
-    return 6 <= hour < 18   # simple version
+    return 6 <= hour < 20   # simple version
 
 # ==========================================
 # PROCESS FILE
@@ -64,7 +64,7 @@ def process_file(filepath, camera_data=None, flower_id=None):
     if not os.path.exists(filepath):
         return new_positions
 
-    print(f"\n========== EVENT PROCESSING FILE: {os.path.basename(filepath)} ==========")
+    print(f"\n================= EVENT PROCESSING FILE: {os.path.basename(filepath)} =================")
     use_camera = is_daytime() and camera_data is not None
 
     if use_camera:
@@ -72,8 +72,9 @@ def process_file(filepath, camera_data=None, flower_id=None):
     else:
         print("[FUSION MODE] NIGHT → LiDAR Only")
 
-    print(f"{'EVENT_ID':<15} {'FLOWER_ID':<15} {'SOURCE':<12} {'PREDICTION':<20} {'CONFIDENCE':<12} {'STATUS'}")
-    print("-" * 90)
+    # print(f"{'EVENT_ID':<15} {'FLOWER_ID':<15} {'SOURCE':<12} {'PREDICTION':<20} {'CONFIDENCE':<12} {'STATUS'}")
+    print(f"{'EVENT_ID':<15} {'FLOWER_ID':<15} {'DURATION':<10} {'MOV':<8} {'SOURCE':<12} {'PREDICTION':<20} {'CONFIDENCE':<12} {'STATUS'}")
+    print("-" * 115)
         
     with open(filepath, "r") as f:
         for line in f:
@@ -89,6 +90,13 @@ def process_file(filepath, camera_data=None, flower_id=None):
             # Predict returns (label, lidar_conf)
             try:
                 label, lidar_conf = classifier.predict(event)
+
+                # Extract features once to get movement_during_visit (index 14) and duration (index 1)
+                from lidar_ML.feature_extractor import extract_features as _extract
+                _feats = _extract(event)
+                movement_during_visit = _feats[14]
+                duration = _feats[1]
+
             except Exception as e:
                 print(f"[ERROR] Skipping event due to: {e}")
                 continue
@@ -116,7 +124,9 @@ def process_file(filepath, camera_data=None, flower_id=None):
             # ======================================
             # LOG BOTH SOURCES
             # ======================================
-            print(f"{str(event_id):<15} {str(flower_id):<15} {'LIDAR':<12} "
+            # print(f"{str(event_id):<15} {str(flower_id):<15} {'LIDAR':<12} "
+            # print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {'LIDAR':<12} "
+            print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {movement_during_visit:<8.4f} {'LIDAR':<12} "
                 f"{'pollinator' if lidar_is_bee else 'not_pollinator':<20} "
                 f"{lidar_conf:.3f}            -")
 
@@ -131,7 +141,9 @@ def process_file(filepath, camera_data=None, flower_id=None):
                     cam_label = "no_detection"
                     cam_log_conf = 0.0
 
-                print(f"{str(event_id):<15} {str(flower_id):<15} {'CAMERA':<12} "
+                # print(f"{str(event_id):<15} {str(flower_id):<15} {'CAMERA':<12} "
+                # print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {'CAMERA':<12} "
+                print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {movement_during_visit:<8.4f} {'CAMERA':<12} "
                       f"{cam_label:<20} "
                       f"{cam_log_conf:.3f}            -")
                 
@@ -160,11 +172,13 @@ def process_file(filepath, camera_data=None, flower_id=None):
 
             status = "DETECTED" if is_bee else "SKIPPED"
 
-            print(f"{str(event_id):<15} {str(flower_id):<15} {source:<12} "
+            # print(f"{str(event_id):<15} {str(flower_id):<15} {source:<12} "
+            # print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {source:<12} "
+            print(f"{str(event_id):<15} {str(flower_id):<15} {duration:<10.3f} {movement_during_visit:<8.4f} {source:<12} "
                   f"{'pollinator' if is_bee else 'not_pollinator':<20} "
                   f"{final_conf:.3f}            {status}")
 
-            print("-" * 90)
+            print("-" * 115)
 
             if not is_bee:
                 continue

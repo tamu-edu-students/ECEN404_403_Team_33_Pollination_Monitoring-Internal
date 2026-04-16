@@ -3,6 +3,18 @@ const DEFAULT_POLLINATORS = [/* ... */]
 
 const DEFAULT_PESTS = [/* ... */]
 
+const SPECIES_ICONS = {
+  'bee': '🐝',  
+  'butterfly': '🦋',
+  'ladybug': '🐞',
+}
+
+function getIconForSpecies(species) {
+  if (!species) return '❓';
+  const key = species.toLowerCase();
+  return SPECIES_ICONS[key] || '❓';
+}
+
 let state = {
   pollinators: DEFAULT_POLLINATORS.slice(),
   pests: DEFAULT_PESTS.slice(),
@@ -35,7 +47,11 @@ function mergeList(oldList, incoming = []) {
       // Increment value instead of replacing
       map[it.label].value = (map[it.label].value || 0) + (it.value || 1)
     } else {
-      map[it.label] = { ...(it), color: it.color || makeColor() }
+      map[it.label] = { 
+        ...(it), 
+        color: it.color || makeColor(),
+        icon: it.icon || getIconForSpecies(it.label)  // Add this line
+      }
     }
   });
   return Object.values(map)
@@ -75,29 +91,8 @@ function makeColor() {
   return gen()
 }
 
-// simulate: tweak existing values and sometimes add a new species
-function simulate() {
-  const randDelta = () => Math.round((Math.random() - 0.4) * 20)
-  const maybeAdd = (list) => {
-    if (Math.random() < 0.18) { // 18% chance to add a new species
-      const newLabel = `Species ${Math.floor(Math.random()*900+100)}`
-      list.push({ label: newLabel, value: Math.max(5, Math.round(Math.random()*40)), color: makeColor() })
-    }
-  }
-
-  const newPoll = state.pollinators.map(p => ({ ...p, value: Math.max(0, p.value + randDelta()) }))
-  maybeAdd(newPoll)
-
-  const newPests = state.pests.map(p => ({ ...p, value: Math.max(0, p.value + randDelta()) }))
-  maybeAdd(newPests)
-
-  state = { ...state, pollinators: newPoll, pests: newPests }
-  notify()
-}
-
 export default {
   getState,
   subscribe,
   update,
-  simulate,
 }

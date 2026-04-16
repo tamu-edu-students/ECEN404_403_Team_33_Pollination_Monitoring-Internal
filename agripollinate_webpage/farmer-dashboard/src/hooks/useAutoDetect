@@ -33,22 +33,36 @@ export default function useAutoDetect(pollIntervalMs = 5000) {
         });
         const data = await res.json();
 
-        const top = data.detections?.[0];
-        if (!top) return;                        // nothing found: ignore
-        const mapped = mapDetectionToLabels(top);
-        if (mapped.species === "Unknown") return; // skip Unknown
+        const detections = data.detections || [];
+        if (!detections.length) return; // nothing found: ignore
 
         const hour = getHourFromFilename(filename);
-        activityStore.addActivity([{ hour, species: mapped.species }]);
+        const pollinators = [];
+        const pests = [];
+        const seenLabels = new Set();
 
-        if (mapped.role === "Pollinator") {
-          insectStore.update("pollinators", [
-            { label: mapped.species, value: 1 },
-          ]);
-        } else {
-          insectStore.update("pests", [
-            { label: mapped.species, value: 1 },
-          ]);
+        detections.forEach((det) => {
+          const mapped = mapDetectionToLabels(det);
+          if (mapped.species === "Unknown") return;
+
+          const key = `${mapped.role}:${mapped.species}`;
+          if (seenLabels.has(key)) return; // avoid duplicate count inside same image
+          seenLabels.add(key);
+
+          activityStore.addActivity([{ hour, species: mapped.species }] );
+
+          if (mapped.role === "Pollinator") {
+            pollinators.push({ label: mapped.species, value: 1 });
+          } else {
+            pests.push({ label: mapped.species, value: 1 });
+          }
+        });
+
+        if (pollinators.length) {
+          insectStore.update("pollinators", pollinators);
+        }
+        if (pests.length) {
+          insectStore.update("pests", pests);
         }
       } catch (err) {
         console.error("auto-detect failed for", filename, err);

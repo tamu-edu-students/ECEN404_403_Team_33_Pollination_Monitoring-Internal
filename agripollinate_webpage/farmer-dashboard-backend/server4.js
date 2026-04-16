@@ -7,6 +7,8 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const FormData = require('form-data'); 
+const BatchCollector = require('./batchCollector');
+
 
 const app = express();
 app.use(cors());
@@ -18,8 +20,12 @@ const raspberryPiPort = process.env.RASPBERRY_PI_PORT || 12345;
 const httpPort = process.env.PORT || 3000;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
 const downloadDir = process.env.DOWNLOAD_DIR || path.join(__dirname, 'downloads');
+const CONFIDENCE_THRESHOLD = 0.5;
 
 if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
+
+// Initialize batch collector
+const batchCollector = new BatchCollector(downloadDir);
 
 // Packet ID Constants
 const PACKET_ID_IMAGE_OUTGOING = 1050;
@@ -172,7 +178,6 @@ async function sendClassificationsToPi(eventId, detections) {
         const header = new PacketHeader(eventId, PACKET_ID_IMAGE_RESPONSE);
         
         // Filter detections by confidence threshold
-        const CONFIDENCE_THRESHOLD = 0.5; // Adjust this value as needed
         const validDetections = detections.filter(det => det.confidence >= CONFIDENCE_THRESHOLD);
         
         // Handle case when no insects detected or no detections meet threshold
@@ -325,9 +330,15 @@ async function handleImagePacket(packet) {
                 detectionCache.set(detectionResult.annotated_filename, detectionResult);
                 console.log(`[CACHE] Saved detection result: ${detectionResult.annotated_filename}.json`);
             }
+
+            try {
+                batchCollector.add(packet.payload, packet.header.event_id, detectionResult.detections, CONFIDENCE_THRESHOLD);
+            } catch (batchErr) {
+                console.error('[BATCH] Error during batch collection:', batchErr);
+            }
             
             // Send classifications back to Raspberry Pi
-            await sendClassificationsToPi(packet.header.event_id, detectionResult.detections);
+            await sendClassificationsToPi(packet.header.event_id, detectionResult.detections.filter(d => d.confidence >= CONFIDENCE_THRESHOLD));
         } else {
             console.log(`[ML] ❌ Detection failed for ${filename}`);
             // Still send empty detections
@@ -495,30 +506,39 @@ app.post('/detect-image', async (req, res) => {
         return res.status(404).json({ error: 'Image not found' });
     }
     
-    // Check if we already have cached detection results in-memory
-    const cacheFilePath = `${imagePath}.json`;
     if (detectionCache.has(filename)) {
-        console.log(`[CACHE HIT] Returning cached detections for ${filename}`);
+        console.log(`[CACHE HIT] ${filename}`);
         return res.json(detectionCache.get(filename));
     }
     
-    // CACHE MISS: Run detection
     console.log(`[CACHE MISS] Running detection for ${filename}...`);
     try {
         const imageBuffer = fs.readFileSync(imagePath);
         const eventId = filename.match(/received_(\d+)_/)?.[1] || generateEventId(Date.now() / 1000);
         const result = await detectObjects(imageBuffer, filename, eventId);
         
-        // Also cache the result here (in case the original detection wasn't cached)
         if (result && result.detections) {
+            result.detections = result.detections.filter(det => det.confidence >= CONFIDENCE_THRESHOLD);
+            result.total_detections = result.detections.length;
+            
             const cacheFilePath = `${imagePath}.json`;
             fs.writeFileSync(cacheFilePath, JSON.stringify(result, null, 2));
-            console.log(`[CACHE] Saved detection result: ${filename}.json`);
+            console.log(`[CACHE] Saved filtered detection result: ${filename}.json`);
         }
         
         res.json(result || { error: 'Detection failed' });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// List all batches
+app.get('/api/batches', (req, res) => {
+    try {
+        const batches = batchCollector.list();
+        res.json({ success: true, batches });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

@@ -32,11 +32,6 @@ export default function TopPollinators({
   const chartHeightPx = 160
   const minBarHeightPx = 14
 
-  // Demo button: trigger a random state update/simulation for testing the component
-  function onSimulate() {
-    insectStore.simulate()
-  }
-
   return (
     <Card className="col-span-2 row-span-1 bg-white border-2 border-blue-200 rounded-lg shadow-lg p-6">
       {/* Header: Title and update status */}

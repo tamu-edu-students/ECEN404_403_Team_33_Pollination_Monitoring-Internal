@@ -1,13 +1,24 @@
 import activityStore from "../state/activityStore.jsx";
+import insectStore from "../state/insectStore.jsx";  
 import React, { useEffect, useState } from "react";
 import Card from "./Card";
 
 export default function ActivityTrends() {
   // Local state to hold the activity array. This pulls initial state from the global activityStore.
   const [activity, setActivity] = useState(activityStore.getState().activity);
-
+  const [storeState, setStoreState] = useState(insectStore.getState());
+  
   // Subscribe to activityStore updates on mount; update local state when store changes.
   useEffect(() => activityStore.subscribe(s => setActivity(s.activity)), []);
+  useEffect(() => insectStore.subscribe(s => setStoreState(s)), []);
+
+  // Function to consistently assign a color to each species in the legend/bars
+  const colorMap = {};
+  [...(storeState.pollinators || []), ...(storeState.pests || [])].forEach(item => {
+    colorMap[item.label] = item.color;
+  });
+
+  const colorForSpecies = s => colorMap[s] || '#888';  // fallback color if not found
 
   // === Aggregate activity entries into {hour: {species: count}} for fast graph lookup ===
   // Example: {14: {Bee: 2, Aphid: 1}, ...}
@@ -23,12 +34,6 @@ export default function ActivityTrends() {
     Object.keys(obj).forEach(s => speciesSet.add(s))
   );
   const speciesList = Array.from(speciesSet);
-
-  // Function to consistently assign a color to each species in the legend/bars
-  const colorForSpecies = s => {
-    const palette = ["#10B981","#F59E0B","#EF4444","#3b82f6","#F472B6","#34D399"];
-    return palette[speciesList.indexOf(s) % palette.length];
-  };
 
   // Array [0 .. 23] for each hour (x-axis bins of chart)
   const hours = Array.from({length:24}, (_,i) => i);

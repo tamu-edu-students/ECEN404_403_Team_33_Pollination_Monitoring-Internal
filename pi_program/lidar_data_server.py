@@ -74,10 +74,7 @@ class LidarDataServer:
             self.receive_thread.start()
             
             return True  
-        except Exception as e:
-            print(f"Failed to start LiDAR data server: {e}")
-            self.running = False
-            return False
+        
         except socket.timeout:
             print(f"Connection timed out after {timeout} seconds")
             print(f"Check if LiDAR Data client is reachable at {self.host}")
@@ -87,6 +84,10 @@ class LidarDataServer:
             print(f"Connection refused by {self.host}:{self.port}")
             print("Check if the LiDAR Data client is running and the port is correct")
             self.connected = False
+            return False
+        except Exception as e:
+            print(f"Failed to start LiDAR data server: {e}")
+            self.running = False
             return False
     
     def stop_server(self):
@@ -122,7 +123,13 @@ class LidarDataServer:
                 if not data:
                     print("LiDAR client disconnected")
                     self.connected = False
-                    break
+
+                    self._attempt_reconnect()  # Attempt to reconnect if client disconnects
+
+                    if not self.running:
+                        break  # Server was stopped, exit loop cleanly
+                    else:
+                        continue  # Reconnected, resume receive loop
                 
                 self.receive_buffer += data
                 
@@ -142,11 +149,40 @@ class LidarDataServer:
                     packet = Packet.deserialize(packet_data)
                     if packet:
                         self._handle_received_packet(packet)
-                
+            
+            except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                if self.running:
+                    print(f"[LIDAR SERVER] Connection error in receive loop: {e}")
+                self.connected = False
+                self._attempt_reconnect()
+                if not self.connected:
+                    break
+                continue
+
             except Exception as e:
                 if self.running:
                     print(f"Error in LiDAR server receive loop: {e}")
                 break
+    
+    def _attempt_reconnect(self):
+        """Attempt to reconnect to LiDAR data client."""
+        print("[LIDAR SERVER] Attempting to reconnect to LiDAR data client...")
+        while self.running and not self.connected:
+            try:
+                self.server_socket.settimeout(5.0)
+                self.client_socket, self.client_address = self.server_socket.accept()
+                self.client_socket.settimeout(None)
+                self.connected = True
+                self.receive_buffer = b''
+                print(f"[LIDAR SERVER] LiDAR data client reconnected: {self.client_address}")
+            except socket.timeout:
+                print("[LIDAR SERVER] Reconnect attempt timed out, retrying...")
+                continue
+            except Exception as e:
+                if self.running:
+                    print(f"[LIDAR SERVER] Reconnect error: {e}, retrying...")
+                time.sleep(1.0)
+                continue
             
     
     def _handle_received_packet(self, packet: Packet):
@@ -183,6 +219,12 @@ class LidarDataServer:
                 serialized = packet.serialize()
                 self.image_server.client_socket.sendall(serialized)
                 print(f"[LIDAR SERVER] Forwarded packet (ID: {packet.header.packet_id}) to image client, event_id: {packet.header.event_id}")
+
+        except (BrokenPipeError, ConnectionResetError, OSError) as e:
+            print(f"[LIDAR SERVER] Error forwarding to image client (connection lost): {e}")
+            # Mark image server as disconnected so it can attempt its own reconnect
+            if self.image_server:
+                self.image_server.connected = False
         except Exception as e:
             print(f"Error forwarding to image client: {e}")
 

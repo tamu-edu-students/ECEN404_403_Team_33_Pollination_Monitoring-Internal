@@ -283,12 +283,17 @@ class LidarConnection:
         for track in tracks:
             if track["hits"] < MIN_HITS:
                 continue
+            
 
             merged_indices = sorted(
                 set(i for block in track["all_indices"] for i in block)
             )
 
             mean_dist = statistics.mean(track["all_dists"])
+            bg = round(mean_dist, 3)
+
+            if bg == 0.0:
+                continue
 
             print(f"Candidate for flower {flower_id}:")
             print(f"Indices {merged_indices}")
@@ -298,7 +303,7 @@ class LidarConnection:
             if include.lower() == 'y':
                 flower_config[f"flower_{flower_id}"] = {
                 "angle_indices": merged_indices,
-                "background_dist": round(mean_dist, 3)
+                "background_dist": bg
                 }
 
                 flower_id += 1

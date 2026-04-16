@@ -39,6 +39,8 @@ class ImageServer:
         self.running = False
         self.lidar_server = lidar_server  # Reference to LiDAR server for message routing
         self.sample = True
+        self.camera_lock = threading.Lock()  # Ensure only one capture at a time
+        self.event_send_lock = threading.Lock()  # Ensure only one event send at a time
         
         # Bidirectional communication
         self.receive_thread = None
@@ -117,6 +119,7 @@ class ImageServer:
         Continuously receive and process packets from image client.
         Handles packet parsing and cross-client message routing.
         """
+
         while self.running and self.connected:
             try:
                 readable, _, _ = select.select([self.client_socket], [], [], 0.5)
@@ -128,7 +131,30 @@ class ImageServer:
                 if not data:
                     print("Image client disconnected")
                     self.connected = False
-                    break
+
+                    # Attempt to reconnect indefinitely until server is stopped
+                    print("[IMAGE SERVER] Attempting to reconnect to image client...")
+                    while self.running and not self.connected:
+                        try:
+                            self.server_socket.settimeout(5.0)
+                            self.client_socket, self.client_address = self.server_socket.accept()
+                            self.client_socket.settimeout(10.0)
+                            self.connected = True
+                            self.receive_buffer = b''  # Clear stale buffer from old connection
+                            print(f"[IMAGE SERVER] Image client reconnected: {self.client_address}")
+                        except socket.timeout:
+                            print("[IMAGE SERVER] Reconnect attempt timed out, retrying...")
+                            continue
+                        except Exception as e:
+                            if self.running:
+                                print(f"[IMAGE SERVER] Reconnect error: {e}, retrying...")
+                            time.sleep(1.0)
+                            continue
+                    
+                    if not self.running:
+                        break  # Server was stopped, exit loop cleanly
+                    else:
+                        continue  # Reconnected, resume receive loop
                 
                 self.receive_buffer += data
                 
@@ -186,34 +212,47 @@ class ImageServer:
     
     def capture_image(self):
         """Capture an image from USB camera using fswebcam"""
-        try:
+        with self.camera_lock:
+            try:
+                
+                # Create unique filename based on timestamp
+                timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
+                image_path = os.path.join(self.save_dir, f"captured_{timestamp}.jpg")
+                
+                # Capture image via USB camera
+                result = subprocess.run(
+                    ["fswebcam", "-r", self.resolution, image_path], 
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+                # Wait for file to be fully written to disk (Pi SD card can be slow)
+                timeout = 10.0
+                interval = 0.1
+                elapsed = 0.0
+                while not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
+                    if elapsed >= timeout:
+                        print(f"Timeout waiting for image file to be ready: {image_path}")
+                        return None
+                    time.sleep(interval)
+                    elapsed += interval
+
+                print(f"Image captured: {image_path}")
+                return image_path 
             
-            # Create unique filename based on timestamp
-            timestamp = datetime.now().strftime("%m-%d-%Y_%H.%M.%S.%f")[:-3]
-            image_path = os.path.join(self.save_dir, f"captured_{timestamp}.jpg")
-            
-            # Capture image via USB camera
-            subprocess.run(
-                ["fswebcam", "-r", self.resolution, image_path], 
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            print(f"Image captured: {image_path}")
-            return image_path 
+                '''
+                self.sample = not self.sample
+                
+                if (self.sample == True):
+                    return 'sample0.jpg'
+                else:
+                    return 'sample1.jpg'
+                '''
+            except subprocess.CalledProcessError:
+                print("Failed to capture image")
+                return None
         
-            '''
-            self.sample = not self.sample
-            
-            if (self.sample == True):
-                return 'sample0.jpg'
-            else:
-                return 'sample1.jpg'
-            '''
-        except subprocess.CalledProcessError:
-            print("Failed to capture image")
-            return None
-    
     
     def send_images_with_packet(self, event_id: str, image_paths: list) -> bool:
         """

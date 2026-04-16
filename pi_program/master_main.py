@@ -13,6 +13,7 @@ import signal
 import sys
 import os
 import threading
+import socket
 from datetime import datetime
 from lidar_parser import LidarConnection
 from event_detector import EventDetector
@@ -43,19 +44,19 @@ BURST_SIZE = 1  # Number of images to capture per trigger
 # LiDAR Data Server Configuration
 LIDAR_DATA_HOST = '0.0.0.0'
 LIDAR_DATA_PORT = 12346
-LIDAR_DATA_SAVE_DIR = "/home/josiah/pi_program/lidar_data"
+LIDAR_DATA_SAVE_DIR = "/home/josiah/pi_program/lidar_downloads"
 TRIGGER_SCANS_TO_SAVE = 10  # Number of scans to save per trigger
 
 # Event Detection Configuration
 EVENT_DIST_THRESHOLD = 0.02  # Distance threshold for occupancy detection (meters)
 EVENT_START_CONFIRM_SCANS = 6
-EVENT_END_CONFIRM_SCANS = 6
+EVENT_END_CONFIRM_SCANS = 15
 
 # Watchdog Configuration
 WATCHDOG_TIMEOUT = 5.0          # Maximum time between scans before watchdog alert (seconds)
 
 # Connection Timeout Configuration
-CONNECTION_TIMEOUT = 10.0       # Timeout for connection attempts before prompting user (seconds)
+CONNECTION_TIMEOUT = 30.0       # Timeout for connection attempts before prompting user (seconds)
 LIDAR_CLIENT_TIMEOUT = True  # Flag to enable/disable waiting for LiDAR client connection at startup
 
 # File Cleanup Configuration
@@ -125,7 +126,8 @@ def prompt_user_input(prompt_text, timeout_seconds=30.0):
     
     def get_input():
         try:
-            user_input = input(prompt_text)
+            print(prompt_text, flush=True)
+            user_input = input()
             response[0] = user_input.lower().strip()
         except EOFError:
             response[0] = None
@@ -154,11 +156,11 @@ def connect_lidar_with_timeout(host, port):
 
         user_response = prompt_user_input(
             "Would you like to run the device in testing mode? (y/n): ",
-            timeout_seconds=30
+            timeout_seconds=60
         )
     
         if user_response == 'y':
-            print("[INIT] Running in TESTING MODE - LiDAR scanner disabled, awaiting user input for event triggers")
+            print("[INIT] Running in TESTING MODE")
             testing_mode = True
             return None, True  # No LiDAR connection, testing mode enabled
         else:
@@ -179,7 +181,7 @@ def connect_lidar_data_server_with_timeout(lidar_data_server):
 
         user_response = prompt_user_input(
             "Would you like to continue without a LiDAR Data client? (y/n): ",
-            timeout_seconds=30
+            timeout_seconds=60
         )
     
         if user_response == 'y':
@@ -194,7 +196,7 @@ def connect_lidar_data_server_with_timeout(lidar_data_server):
     return True
 
 
-def _handle_event_start_async(event, event_count, image_server):
+def _handle_event_start_async(event, event_count, image_server, lidar_data_server):
     """
     Background worker for event start handling.
     Runs in separate thread to avoid blocking main LiDAR processing loop.
@@ -209,28 +211,29 @@ def _handle_event_start_async(event, event_count, image_server):
     print(f"[EVENT] Event ID generated: {event_id}")
     
     # Trigger image capture burst with event ID and packet-based protocol
-    if image_server and image_server.connected:
+    if (image_server and image_server.connected and lidar_data_client_enabled and lidar_data_server and lidar_data_server.connected) or (image_server and image_server.connected and not lidar_data_client_enabled):
         print(f"[EVENT {event_id}] Sending image burst to image client...")
-        # Capture images and send with packet protocol
-        image_paths = []
-        for i in range(BURST_SIZE):
-            image_path = image_server.capture_image()
-            if image_path:
-                image_paths.append(image_path)
-        
-        if image_paths:
-            sent_ok = image_server.send_images_with_packet(event_id, image_paths)
-            if sent_ok:
-                print(f"[EVENT {event_id}] Successfully sent {len(image_paths)} images")
+        with image_server.event_send_lock:
+            # Capture images and send with packet protocol
+            image_paths = []
+            for i in range(BURST_SIZE):
+                image_path = image_server.capture_image()
+                if image_path:
+                    image_paths.append(image_path)
+            
+            if image_paths:
+                sent_ok = image_server.send_images_with_packet(event_id, image_paths)
+                if sent_ok:
+                    print(f"[EVENT {event_id}] Successfully sent {len(image_paths)} images")
+                else:
+                    print(f"[EVENT {event_id}] Failed to send image packet(s)")
             else:
-                print(f"[EVENT {event_id}] Failed to send image packet(s)")
-        else:
-            print(f"[EVENT {event_id}] Failed to capture any images")
+                print(f"[EVENT {event_id}] Failed to capture any images")
     else:
-        print("[WARNING] Image server not connected, skipping image capture")
+        print("[WARNING] Image server or LiDAR data server not enabled, skipping image capture")
 
 
-def on_event_start(event, event_count, image_server):
+def on_event_start(event, event_count, image_server, lidar_data_server):
     """
     Callback function triggered when flower visit event starts.
     Spawns background thread to handle blocking operations.
@@ -238,13 +241,13 @@ def on_event_start(event, event_count, image_server):
     # Offload to background thread to avoid blocking main scan processing
     worker = threading.Thread(
         target=_handle_event_start_async,
-        args=(event, event_count, image_server),
+        args=(event, event_count, image_server, lidar_data_server),
         daemon=True
     )
     worker.start()
 
 
-def _handle_event_end_async(event, lidar_data_server, lidar_data_client_enabled):
+def _handle_event_end_async(event, lidar_data_server, lidar_data_client_enabled, image_server):
     """
     Background worker for event end handling.
     Runs in separate thread to avoid blocking main LiDAR processing loop.
@@ -259,7 +262,7 @@ def _handle_event_end_async(event, lidar_data_server, lidar_data_client_enabled)
     print(f"[EVENT {event_id}] Processing event end data...")
     
     # Send event data to LiDAR data client if enabled
-    if lidar_data_client_enabled and lidar_data_server and lidar_data_server.connected:
+    if lidar_data_client_enabled and lidar_data_server and lidar_data_server.connected and image_server and image_server.connected:
         print(f"[EVENT {event_id}] Sending event data to LiDAR client...")
         
         # Prepare event data for transmission
@@ -285,13 +288,14 @@ def _handle_event_end_async(event, lidar_data_server, lidar_data_client_enabled)
             print(f"[EVENT {event_id}] Successfully sent event data packet")
         except Exception as e:
             print(f"[EVENT {event_id}] Failed to send event data: {e}")
+
     elif not lidar_data_client_enabled:
         print("[INFO] LiDAR data client disabled, skipping event data transmission")
     else:
-        print("[WARNING] LiDAR data server not connected, skipping event data transmission")
+        print("[WARNING] LiDAR data server or image server not connected, skipping event data transmission")
 
 
-def on_event_end(event, lidar_data_server):
+def on_event_end(event, lidar_data_server, image_server):
     """
     Callback function triggered when flower visit event ends.
     Spawns background thread to handle blocking operations.
@@ -301,7 +305,7 @@ def on_event_end(event, lidar_data_server):
     # Offload to background thread to avoid blocking main scan processing
     worker = threading.Thread(
         target=_handle_event_end_async,
-        args=(event, lidar_data_server, lidar_data_client_enabled),
+        args=(event, lidar_data_server, lidar_data_client_enabled, image_server),
         daemon=True
     )
     worker.start()
@@ -358,7 +362,8 @@ def main():
         # Optional automatic flower configuration
         flower_config = None
 
-        auto_config = input("Would you like to auto-configure flower detection? (y/n): ").lower().strip()
+        print("Would you like to auto-configure flower detection? (y/n): ", flush=True)
+        auto_config = input().lower().strip()
         if auto_config == 'y' and lidar is not None:
             flower_config = lidar.setup_flowers()
 
@@ -426,7 +431,6 @@ def main():
         
         if testing_mode:
             print("\n[READY] TESTING MODE - Awaiting user input for event simulation...")
-            print("Press Ctrl+C to stop.\n")
             print("="*60)
             print("Testing Mode Instructions:")
             print("  - Press ENTER to simulate an event trigger")
@@ -461,7 +465,8 @@ def main():
             while running:
                 try:
                     # Wait for user input (non-blocking check)
-                    user_input = input("[TEST] Press ENTER to simulate event, or type 'quit' to exit: \n")
+                    print("[TEST] Press ENTER to simulate event, or type 'quit' to exit: \n", flush=True)
+                    user_input = input()
                     
                     if user_input.lower() == 'quit':
                         running = False
@@ -478,7 +483,7 @@ def main():
                         "start_time": time.time(),
                         "angles": [125, 126, 127, 128, 129]
                     }
-                    on_event_start(event_start, object_count, image_server)
+                    on_event_start(event_start, object_count, image_server, lidar_data_server)
                     
                     # Simulate event end
                     event_end = {
@@ -493,7 +498,7 @@ def main():
                         "timestamp": event_start["start_time"] + (1774325482.7165854 - 1774325482.1839502),
                         "label": None
                     }
-                    on_event_end(event_end, lidar_data_server)
+                    on_event_end(event_end, lidar_data_server, image_server)
                     print()
                     
                     # Periodic file cleanup
@@ -542,9 +547,9 @@ def main():
                 for event in triggered_events:
                     if event["type"] == "start":
                         object_count += 1
-                        on_event_start(event, object_count, image_server)
+                        on_event_start(event, object_count, image_server, lidar_data_server)
                     elif event["type"] == "end":
-                        on_event_end(event, lidar_data_server)
+                        on_event_end(event, lidar_data_server, image_server)
                 
                 # Print status every 100 scans
                 if scan_count % 100 == 0:

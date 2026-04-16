@@ -165,6 +165,10 @@ def main():
         )
 
         mean_dist = statistics.mean(track["all_dists"])
+        bg = round(mean_dist, 3)
+
+        if bg == 0.0:
+            continue
 
         flower_config[f"flower_{flower_id}"] = {
             "angle_indices": merged_indices,

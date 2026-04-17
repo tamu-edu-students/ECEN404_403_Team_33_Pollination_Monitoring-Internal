@@ -54,7 +54,7 @@ def find_existing_flower(x, y):
 
 def is_daytime():
     hour = datetime.now().hour
-    return 6 <= hour < 20   # simple version
+    return 6 <= hour < 23   # simple version
 
 # ==========================================
 # PROCESS FILE
@@ -151,8 +151,15 @@ def process_file(filepath, camera_data=None, flower_id=None):
             # FUSION LOGIC
             # ======================================
             if use_camera:
+                camera_no_detection = not camera_is_bee and not camera_is_non_pollinator
+
+                # Daytime: camera sees nothing → veto LiDAR pollinator call
+                if camera_no_detection:
+                    is_bee = False
+                    source = "CAMERA"
+                    final_conf = 0.0
                 # Camera confidently sees a non-pollinator and beats LiDAR → veto
-                if camera_is_non_pollinator and camera_non_pollinator_conf >= lidar_conf:
+                elif camera_is_non_pollinator and camera_non_pollinator_conf >= lidar_conf:
                     is_bee = False
                     source = "CAMERA"
                     final_conf = camera_non_pollinator_conf

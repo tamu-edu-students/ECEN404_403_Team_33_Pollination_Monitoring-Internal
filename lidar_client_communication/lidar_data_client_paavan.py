@@ -2,7 +2,7 @@
     Created by: Josiah Faircloth  
     Updated by: Paavan Bagla
     Last Updated: 01/28/2026
-
+ 
     Compatible with Master Main Version 2.0
     
     Receives LiDAR scan data files using packet-based protocol.
@@ -16,6 +16,7 @@ import os
 import sys
 import json
 import struct
+import time
 from datetime import datetime
 
 # ============================================================
@@ -173,7 +174,6 @@ def handle_image_response_packet(packet: Packet):
         results = []                
         all_detections_sorted = []  # NEW: raw detections sorted right→left
 
-
         for line in lines:
             data = json.loads(line)
             detections = data.get("detections", [])
@@ -270,145 +270,159 @@ def main():
     # Server configuration
     HOST = "10.250.76.217" # Rasp Pi : 192.168.1.74 (Home WIFI) : 10.250.76.217 (TAMU IoT)
     PORT = 12346 # Different port from image client
+    RECONNECT_DELAY = 5  # seconds between reconnection attempts
 
     download_dir = "lidar_downloads"
-    camera_results = {}   # event_id -> camera info
-    pending_files = {}      # event_id -> lidar file path
 
-    try:
-        # Create TCP socket and connect to server
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))\
-        
-        print(f"Connected to LiDAR data server at {HOST}:{PORT}")
-        print("Waiting for LiDAR scan data files... (Ctrl+C to quit)\n")
+    while True:
+        camera_results = {}  # event_id -> camera info
+        pending_files = {}   # event_id -> lidar file path
+        client_socket = None
 
-        receive_buffer = b""
+        try:
+            # Create TCP socket and connect to server
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((HOST, PORT))\
+            
+            print(f"[LIDAR CLIENT] 😄 Connected to LiDAR data server at {HOST}:{PORT}")
+            print("Waiting for LiDAR scan data files... (Ctrl+C to quit)\n")
 
-        # =====================================================
-        # HELPER: process event if both parts exist
-        # =====================================================
-        def try_process_event(event_id):
-            if event_id in pending_files and event_id in camera_results:
-                
-                event_data = pending_files[event_id]
-                json_file_path = event_data["file_path"]
-                flower_id = event_data["flower_id"]  # e.g. "flower_1", "flower_2"
+            receive_buffer = b""
 
-                cam_store = camera_results[event_id]
-                cam_results_list = cam_store["results"]
-                sorted_detections = cam_store["sorted_detections"]
+            # =====================================================
+            # HELPER: process event if both parts exist
+            # =====================================================
+            def try_process_event(event_id):
+                if event_id in pending_files and event_id in camera_results:
+                    
+                    event_data = pending_files[event_id]
+                    json_file_path = event_data["file_path"]
+                    flower_id = event_data["flower_id"]  # e.g. "flower_1", "flower_2"
 
-                # Extract flower index from flower_id (flower_1 → index 0, flower_2 → index 1)
-                try:
-                    flower_index = int(flower_id.split("_")[1]) - 1
-                except (IndexError, ValueError):
-                    flower_index = 0
+                    cam_store = camera_results[event_id]
+                    cam_results_list = cam_store["results"]
+                    sorted_detections = cam_store["sorted_detections"]
 
-                # Build per-flower cam_data using the detection at this flower's position
-                POLLINATOR_CLASSES = {"bee", "butterfly", "ladybug"}
-                NON_POLLINATOR_CLASSES = {"beetle", "grasshopper"}
+                    # Extract flower index from flower_id (flower_1 → index 0, flower_2 → index 1)
+                    try:
+                        flower_index = int(flower_id.split("_")[1]) - 1
+                    except (IndexError, ValueError):
+                        flower_index = 0
 
-                if flower_index < len(sorted_detections):
-                    det = sorted_detections[flower_index]
-                    class_name = det.get("class_name", "").lower()
-                    confidence = det.get("confidence", 0.0)
-                    is_pollinator = class_name in POLLINATOR_CLASSES
-                    is_non_pollinator = class_name in NON_POLLINATOR_CLASSES
+                    # Build per-flower cam_data using the detection at this flower's position
+                    POLLINATOR_CLASSES = {"bee", "butterfly", "ladybug"}
+                    NON_POLLINATOR_CLASSES = {"beetle", "grasshopper"}
 
-                    cam_data = [{
-                        "pollinator": is_pollinator,
-                        "non_pollinator": is_non_pollinator,
-                        "count": 1,
-                        "confidence": confidence if is_pollinator else 0.0,
-                        "non_pollinator_confidence": confidence if is_non_pollinator else 0.0,
-                        "top_pollinator_class": class_name if is_pollinator else None,
-                        "top_non_pollinator_class": class_name if is_non_pollinator else None,
-                    }]
-                else:
-                    # Fallback: no detection for this flower position
-                    cam_data = cam_results_list
+                    if flower_index < len(sorted_detections):
+                        det = sorted_detections[flower_index]
+                        class_name = det.get("class_name", "").lower()
+                        confidence = det.get("confidence", 0.0)
+                        is_pollinator = class_name in POLLINATOR_CLASSES
+                        is_non_pollinator = class_name in NON_POLLINATOR_CLASSES
 
-                print(f"[EVENT INFO] Event {event_id} triggered at Flower: {flower_id}")
-                response_packet = create_lidar_response_packet(
-                    event_id, json_file_path, cam_data, flower_id
-                )
+                        cam_data = [{
+                            "pollinator": is_pollinator,
+                            "non_pollinator": is_non_pollinator,
+                            "count": 1,
+                            "confidence": confidence if is_pollinator else 0.0,
+                            "non_pollinator_confidence": confidence if is_non_pollinator else 0.0,
+                            "top_pollinator_class": class_name if is_pollinator else None,
+                            "top_non_pollinator_class": class_name if is_non_pollinator else None,
+                        }]
+                    else:
+                        # Fallback: no detection for this flower position
+                        cam_data = cam_results_list
 
-                client_socket.sendall(response_packet.serialize())
-                print(f"[LIDAR CLIENT] Sent 2025 response for event {event_id}")
-                print("=" * 115 + "\n")
+                    print(f"[EVENT INFO] Event {event_id} triggered at Flower: {flower_id}")
+                    response_packet = create_lidar_response_packet(
+                        event_id, json_file_path, cam_data, flower_id
+                    )
 
-                pending_files.pop(event_id, None)
-                camera_results.pop(event_id, None)
+                    client_socket.sendall(response_packet.serialize())
+                    print(f"[LIDAR CLIENT] Sent 2025 response for event {event_id}")
+                    print("=" * 115 + "\n")
 
-        # =====================================================
-        # MAIN RECEIVE LOOP
-        # =====================================================
-        while True:
-            data = client_socket.recv(4096)
-            if not data:
-                print("Server closed connection")
-                break
-            receive_buffer += data
+                    pending_files.pop(event_id, None)
+                    camera_results.pop(event_id, None)
 
-            # Process all complete packets in buffer
+            # =====================================================
+            # MAIN RECEIVE LOOP
+            # =====================================================
             while True:
-                packet, receive_buffer = receive_packet(receive_buffer)
-                if packet is None:
-                    break # Need more data
+                data = client_socket.recv(4096)
+                if not data:
+                    print("\n[LIDAR CLIENT] ⚠️ Server closed the connection.")
+                    break
+                receive_buffer += data
 
-                packet_id = packet.header.packet_id
-                event_id = packet.header.event_id
+                # Process all complete packets in buffer
+                while True:
+                    packet, receive_buffer = receive_packet(receive_buffer)
+                    if packet is None:
+                        break # Need more data
 
-                # --------------------------------------------------
-                # LIDAR PACKET (1025) FROM SERVER
-                # --------------------------------------------------
-                if packet_id == PACKET_ID_LIDAR_OUTGOING:
-                    
-                    file_path, flower_id = handle_lidar_packet(packet, download_dir)
+                    packet_id = packet.header.packet_id
+                    event_id = packet.header.event_id
 
-                    # guard against bad save
-                    if file_path is None:
-                        continue
-                    
-                    pending_files[event_id] = {
-                        "file_path": file_path,
-                        "flower_id": flower_id
-                    }
-                    
-                    # try processing (handles IMAGE → LIDAR case)
-                    try_process_event(event_id)
+                    # --------------------------------------------------
+                    # LIDAR PACKET (1025) FROM SERVER
+                    # --------------------------------------------------
+                    if packet_id == PACKET_ID_LIDAR_OUTGOING:
+                        
+                        file_path, flower_id = handle_lidar_packet(packet, download_dir)
 
-                # --------------------------------------------------
-                # 2050 IMAGE RESPONSE
-                # --------------------------------------------------
-                elif packet_id == PACKET_ID_IMAGE_RESPONSE:
-
-                    event_id, cam_result, sorted_detections = handle_image_response_packet(packet)
-
-                    if cam_result is not None:
-                        # Store the full results list AND sorted detections for per-flower assignment
-                        camera_results[event_id] = {
-                            "results": cam_result,
-                            "sorted_detections": sorted_detections  # index 0 = rightmost = flower_1
+                        # guard against bad save
+                        if file_path is None:
+                            continue
+                        
+                        pending_files[event_id] = {
+                            "file_path": file_path,
+                            "flower_id": flower_id
                         }
+                        
+                        # try processing (handles IMAGE → LIDAR case)
+                        try_process_event(event_id)
 
-                    # try processing (handles LIDAR → IMAGE case)
-                    try_process_event(event_id)
-                    
-                else:
-                    print(f"[LIDAR CLIENT] Unknown packet ID: {packet_id}")
+                    # --------------------------------------------------
+                    # 2050 IMAGE RESPONSE
+                    # --------------------------------------------------
+                    elif packet_id == PACKET_ID_IMAGE_RESPONSE:
 
-    except ConnectionRefusedError:
-        print(f"Could not connect to server at {HOST}:{PORT}")
-        print("Make sure the server is running.")
+                        event_id, cam_result, sorted_detections = handle_image_response_packet(packet)
+
+                        if cam_result is not None:
+                            # Store the full results list AND sorted detections for per-flower assignment
+                            camera_results[event_id] = {
+                                "results": cam_result,
+                                "sorted_detections": sorted_detections  # index 0 = rightmost = flower_1
+                            }
+
+                        # try processing (handles LIDAR → IMAGE case)
+                        try_process_event(event_id)
+                        
+                    else:
+                        print(f"[LIDAR CLIENT] Unknown packet ID: {packet_id}")
+
+        except ConnectionRefusedError:
+            print(f"\n[LIDAR CLIENT] ⚠️  Could not connect to server at {HOST}:{PORT}. Make sure the server (master_main) is running.")
+ 
+        except Exception as e:
+            print(f"\n[LIDAR CLIENT] ⚠️  Connection error: {e}")
+ 
+        finally:
+            if client_socket:
+                client_socket.close()
         
-    except Exception as e:
-        print(f"Client error: {e}")
-
-    finally:
-        client_socket.close()
-        print("Connection closed.")
+        # =====================================================
+        # RECONNECT WAIT
+        # =====================================================
+        print(f"[LIDAR CLIENT] ⏳ Retrying connection in {RECONNECT_DELAY} seconds... (Ctrl+C to quit)")
+        try:
+            time.sleep(RECONNECT_DELAY)
+        except KeyboardInterrupt:
+            print("\n[LIDAR CLIENT] Exiting.")
+            break
+            
 
 
 if __name__ == "__main__":

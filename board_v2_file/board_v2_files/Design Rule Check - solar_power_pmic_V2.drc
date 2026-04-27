@@ -1,0 +1,59 @@
+Protel Design System Design Rule Check
+PCB File : C:\Users\Public\Documents\Altium\ECEN404_solar_power_pmic_V2\solar_power_pmic_V2.PcbDoc
+Date     : 1/15/2026
+Time     : 12:04:34 PM
+
+Processing Rule : Clearance Constraint (Gap=0.127mm) (All),(All)
+   Violation between Clearance Constraint: (Collision < 0.127mm) Between Polygon Region (7 hole(s)) Top Layer And Track (114.935mm,43.815mm)(114.935mm,45.085mm) on Top Layer 
+Rule Violations :1
+
+Processing Rule : Short-Circuit Constraint (Allowed=No) (All),(All)
+   Violation between Short-Circuit Constraint: Between Polygon Region (7 hole(s)) Top Layer And Track (114.935mm,43.815mm)(114.935mm,45.085mm) on Top Layer Location : [X = 114.935mm][Y = 44.131mm]
+Rule Violations :1
+
+Processing Rule : Un-Routed Net Constraint ( (All) )
+   Violation between Un-Routed Net Constraint: Net NetD2_1 Between Pad R_A-2(75.347mm,62.865mm) on Top Layer And Pad D2-1(75.392mm,71.882mm) on Multi-Layer 
+   Violation between Un-Routed Net Constraint: Net NetD2_1 Between Pad D2-1(75.392mm,71.882mm) on Multi-Layer And Pad R_shunt-1(86.105mm,78.359mm) on Top Layer 
+Rule Violations :2
+
+Processing Rule : Modified Polygon (Allow modified: No), (Allow shelved: No)
+Rule Violations :0
+
+Processing Rule : Width Constraint (Min=0.254mm) (Max=0.254mm) (Preferred=0.254mm) (All)
+Rule Violations :0
+
+Processing Rule : Routing Topology Rule(Topology=Shortest) (All)
+Rule Violations :0
+
+Processing Rule : Power Plane Connect Rule(Relief Connect )(Expansion=0.508mm) (Conductor Width=0.254mm) (Air Gap=0.254mm) (Entries=4) (All)
+Rule Violations :0
+
+Processing Rule : Hole Size Constraint (Min=0.025mm) (Max=3.048mm) (InComponent('J3'))
+Rule Violations :0
+
+Processing Rule : Hole Size Constraint (Min=0.025mm) (Max=2.54mm) (All)
+Rule Violations :0
+
+Processing Rule : Hole To Hole Clearance (Gap=0.254mm) (All),(All)
+Rule Violations :0
+
+Processing Rule : Minimum Solder Mask Sliver (Gap=0.102mm) (All),(All)
+Rule Violations :0
+
+Processing Rule : Silk To Solder Mask (Clearance=0.127mm) (IsPad),(All)
+Rule Violations :0
+
+Processing Rule : Silk to Silk (Clearance=0.254mm) (All),(All)
+Rule Violations :0
+
+Processing Rule : Net Antennae (Tolerance=0mm) (All)
+   Violation between Net Antennae: Track (114.935mm,43.815mm)(114.935mm,45.085mm) on Top Layer 
+Rule Violations :1
+
+Processing Rule : Height Constraint (Min=0mm) (Max=25.4mm) (Prefered=12.7mm) (All)
+Rule Violations :0
+
+
+Violations Detected : 5
+Waived Violations : 0
+Time Elapsed        : 00:00:00

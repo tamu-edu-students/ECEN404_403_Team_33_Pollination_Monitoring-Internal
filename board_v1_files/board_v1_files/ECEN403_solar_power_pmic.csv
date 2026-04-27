@@ -1,0 +1,30 @@
+Line #,Name,Description,Designator,Manufacturer 1,Manufacturer Part Number 1,Manufacturer Lifecycle 1,Supplier 1,Supplier Part Number 1,Supplier Unit Price 1,Supplier Subtotal 1,Quantity
+,,,,,,,,,,,
+,1N5400G,"Standard Recovery Rectifier, 2-Pin Axial_Lead, Pb-Free, Bulk Box",D3,onsemi,1N5400G,Volume Production,Arrow Electronics,1N5400G,0.2436,0.2436,3
+,BD242BG,"Complementary Silicon Plastic Power Transistor, 3-Pin TO-220, Pb-Free, Tube",Q1,onsemi,BD242BG,End of Life,Arrow Electronics,BD242BG,0.2103,0.2103,3
+,CRCW0805200KJNEA,,R_A,Vishay,CRCW0805200KJNEA,Volume Production,Arrow Electronics,CRCW0805200KJNEA,0.0036,0.0036,3
+,LM2678T-12/NOPB,"SIMPLE SWITCHER® High Efficiency 5A Step-Down Voltage Regulator, 7-pin TO-220, Pb-Free",U1,Texas Instruments,LM2678T-12/NOPB,Volume Production,Arrow Electronics,LM2678T-12/NOPB,0.556,0.556,3
+,1N4001-E3/73,DIODE GEN PURP 50V 1A DO204AL,D2,Vishay,1N4001-E3/73,Volume Production,DigiKey,1N4001-E3/73GICT-ND,0.15,0.15,3
+,6.94108E+11,,J3,Wurth Elektronik,6.94108E+11,Unknown,DigiKey,732-5934-ND,0.92,0.92,3
+,BQ24450DWTR,"Integrated Charge Controller for Lead-Acid Batteries, 5 V, 16-pin SOIC (DW), Green (RoHS & no Sb/Br)",U2,Texas Instruments,BQ24450DWTR,Volume Production,DigiKey,296-24367-1-ND,9.71,9.71,3
+,C2012C0G1H103K060AA,Multilayer Ceramic Capacitors 10nF ±10% 50V C0G SMD 0805,C3,TDK,C2012C0G1H103K060AA,Not Recommended for New Design,DigiKey,445-14311-1-ND,0.27,0.27,3
+,CB2518T100K,SMD Inductors 10uH ±10% 0.82A 0.325O 1007,L1,Taiyo Yuden,CB2518T100K,Volume Production,DigiKey,587-2189-1-ND,0.12,0.12,3
+,CRCW080513K0JNEA,"RES Thick Film, 13kO, 5%, 0.125W, 200ppm/°C, 0805",R_P,Vishay,CRCW080513K0JNEA,Volume Production,DigiKey,541-13KACT-ND,0.1,0.1,3
+,GRM155R71C104KA88D,CAP CER 0.1UF 16V X7R 0402,C2,Murata,GRM155R71C104KA88D,Not Recommended for New Design,DigiKey,490-3261-1-ND,0.1,0.1,3
+,RG3216P-1503-B-T5,"Automotive Metal Thin Film Chip Resistor, 1206, 150kO, 0.1%, 25ppm/°C, 0.25W, 200V",R_D2,Susumu,RG3216P-1503-B-T5,Volume Production,DigiKey,408-RG3216P-1503-B-T5CT-ND,0.23,0.23,3
+,RT0603BRC07500RL,"Fixed Resistor, Thin Film, 0.1W, 500ohm, 75V, 0.1% +/-Tol, 15ppm/Cel, Surface Mount, 0603",R_comp,Yageo Group,RT0603BRC07500RL,Volume Production,DigiKey,13-RT0603BRC07500RLCT-ND,0.45,0.45,3
+,BD241CG,"Complementary Silicon Plastic Power Transistor, 3-Pin TO-220, Pb-Free, Tube",Q2,onsemi,BD241CG,Volume Production,Farnell,3253662,1.35,1.35,3
+,ECA1HHG331B,Aluminum Electrolytic Capacitors (Radial Lead Type) AEC-Q200 Qualified 330uF ±20% 50V,Cout,Panasonic,ECA1HHG331B,Volume Production,Farnell,3346418,0.72873,0.72873,3
+,RC0402FR-0746K4L,,R_C,Yageo Group,RC0402FR-0746K4L,Volume Production,Farnell,4013201,0.00763,0.07629,3
+,282836-2,"Female Header, Pitch 5 mm, 1 x 2 Position, Height 10 mm, Tail Length 3.5 mm, Rohs, Bulk",J2,TE Connectivity,282836-2,Volume Production,Future Electronics,4188728,0.25,0.25,3
+,20SVPF180M,Conductive Polymer Aluminum Solid Capacitors (OS-CON) 180uF ±20% 20V RADIAL SMT 8x6.9mm,C1,Panasonic,20SVPF180M,Volume Production,Mouser,667-20SVPF180M,1.3,1.3,3
+,1440067,CONN RCPT FMALE 5POS GOLD SOLDER,J4,Phoenix Contact,1440067,Volume Production,Mouser,651-1440067,21.27,21.27,3
+,CDBC540-G,DIODE SCHOTTKY 40V 5A DO214AB,D1,Comchip,CDBC540-G,Obsolete,Mouser,750-CDBC540-G,0.66,0.66,3
+,CRMA1206AF500KFKEF,CRMA1206AF500KFKEF Res Thick Film 1206 500K Ohm 1% 0.3W ±100ppm/C Pad SMD Automotive T/R,R_D1,Vishay,CRMA1206AF500KFKEF,Volume Production,Mouser,71-CRMA1206AF500KFKF,0.41,0.41,3
+,ERJ-2GEJ681X,,R_T,Panasonic,ERJ-2GEJ681X,Volume Production,Mouser,667-ERJ-2GEJ681X,0.1,0.1,3
+,RC1206FR-103K3L,,R_B,Yageo Group,RC1206FR-103K3L,Volume Production,Mouser,603-RC1206FR-103K3L,0.1,0.1,3
+,USB4105-GF-A,CONN RCPT USB2.0 TYPEC 5A,J1,Global Connector Technology,USB4105-GF-A,Volume Production,Mouser,640-USB4105-GF-A,0.78,0.78,3
+,WSL2512R1250FEA,Res Metal Strip 2512 0.125 Ohm 1% 1W ±75ppm/°C Molded SMD SMD Embossed Plastic T/R,R_ISNS,Vishay,WSL2512R1250FEA,Volume Production,Mouser,71-WSL2512R1250FEA,1.27,1.27,3
+,08051C224K4T2A,"Automotive Ceramic Capacitor, 0805, 220nF, 10%, X7R, 15%, 100V",C_comp,KYOCERA AVX,08051C224K4T2A,Volume Production,Newark,08AK4872,0.073,0.073,3
+,CRCW06035K10JNEA,"RES Thick Film, 5.1kO, 5%, 0.1W, 200ppm/°C, 0603",R1,Vishay,CRCW06035K10JNEA,Volume Production,Newark,89M6773,0.003,0.006,3
+,CRCW06035K10JNEA,"RES Thick Film, 5.1kO, 5%, 0.1W, 200ppm/°C, 0603",R2,Vishay,CRCW06035K10JNEA,Volume Production,Newark,89M6773,0.003,0.006,3

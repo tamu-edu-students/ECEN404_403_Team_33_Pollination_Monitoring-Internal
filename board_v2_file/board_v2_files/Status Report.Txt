@@ -1,0 +1,14 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [ECEN404_solar_power_pmic_V2.PrjPcb]
+   Generated File[revised_solar_power_pmic_V2-RoundHoles.TXT]
+   Generated File[revised_solar_power_pmic_V2-SlotHoles.TXT]
+   Generated File[revised_solar_power_pmic_V2-RectHoles.TXT]
+   Generated File[revised_solar_power_pmic_V2.LDP]
+   Generated File[revised_solar_power_pmic_V2.DRR]
+
+
+Files Generated   : 5
+Documents Printed : 0
+
+Finished Output Generation At 11:09:24 PM On 2/3/2026

@@ -1,10 +1,10 @@
-# SICKSense Agripollinate Pi Program
+﻿# SICKSense Agripollinate Pi Program
 
 This folder contains the Raspberry Pi master-side runtime for flower-visit event detection, image capture, and bidirectional packet routing between image and LiDAR clients.
 
-## Updated Program Structure
+## Program Structure
 
-The architecture has been refactored from the earlier object-tracking layout into an event-driven, flower-centric pipeline:
+The system operates as an event-driven, flower-centric pipeline:
 
 1. LiDAR stream is read in real time.
 2. Flower occupancy is detected with per-flower thresholds and confirmation windows.
@@ -24,10 +24,11 @@ The architecture has been refactored from the earlier object-tracking layout int
      - Manages TCP connection to the SICK LiDAR scanner.
      - Parses `LMDscandata` telegrams.
      - Supports selective index parsing so only required flower angle indices are decoded for detection.
+     - Integrates flower configuration setup, deriving flower angle indices and background distances from baseline scans at startup for a seamless end-to-end workflow.
 
 - **`event_detector.py`**
      - Performs flower visit detection from scan data.
-     - Uses configured flower angle indices + background distances.
+     - Uses configured flower angle indices and background distances.
      - Emits `start` and `end` events with distance history and metadata.
 
 - **`image_capture.py`**
@@ -40,47 +41,58 @@ The architecture has been refactored from the earlier object-tracking layout int
      - Sends event packets (`1025`) and handles LiDAR-client responses (`2025`).
      - Forwards responses to the image server when connected.
 
-- **`communication_protocol.py`**
+### Shared Protocol Module
+
+- **`communication_protocol.py`** *(stored in the project root, outside this directory — shared across subsystems)*
      - Defines packet header/payload format, serialization, and parsing.
      - Defines packet IDs used by both server paths (`1025`, `1050`, `2025`, `2050`).
      - Provides shared event ID helpers.
 
-### Setup / Utility Module
+### External Troubleshooting Utility
 
 - **`flower_setup.py`**
-     - One-time/setup tool to build flower configuration from baseline scans.
-     - Produces flower angle indices and background distances for use by the event detector.
+     - Standalone utility for manually running and inspecting the flower configuration process outside of the main runtime.
+     - Useful for diagnosing sensor placement, verifying baseline scans, and validating flower angle indices and background distances in isolation.
+     - Flower configuration logic is fully integrated into `lidar_parser.py` for normal operation; this script is intended for troubleshooting purposes only.
 
 ### Data Directories
 
-- **`image_downloads/`** - local image output/download area.
-- **`lidar_downloads/`** - local LiDAR/event data output/download area.
+- **`captured_images/`** — local image output/download area.
+- **`lidar_downloads/`** — local LiDAR/event data output/download area.
 
-## High-Level Data Flow
+## Master_Main Data Flow
 
 ```text
-LiDAR Scanner
-          -> lidar_parser
-          -> event_detector
-                -> on start: image_capture (send 1050 packets)
-                -> on end:   lidar_data_server (send 1025 packets)
+Master_Main Requires some user input on program statup but is designed to run smoothly with no human interference after the initial setup phase.
 
-Image client response (2050)
-          -> image_capture
-          -> forwarded to lidar_data_server / LiDAR client
+1. LiDAR Scanner connection is established
+     - If a timeout or connection failure occurs the user will be asked if connection should be skipped
+     - Yes -> Program will continue in TESTING mode without a scanner connected. Further connections will proceed as normal
+     - No -> retry conncection
 
-LiDAR client response (2025)
-          -> lidar_data_server
-          -> forwarded to image_capture / Image client
+2. If Scanner is connected sucessfully, User is asked if auto flower config should be performed
+     - Yes -> Flower setup function runs
+           -> each detected flower will require confirmation
+     - No -> default Flower setup data is used
+
+3. Image Server is launched, client connected
+     - listens indefinetely untill a connection is made
+
+4. LiDAR Data Server is launched
+     - If a timeout or connection failure occurs the user will be asked if connection should be skipped
+     - Yes -> Program will continue with no LiDAR Data Client
+     - No -> retry connection
+
+5. Parsing begins
+     - If TESTING mode -> Program will simply wait for user input to simulate an event
+     - If not TESTING mode -> Program will begin parsing lidar data in real time, events may now be triggered by placeing an object in front of configured flowers
+
+6. Automatic Connection handling
+     - At this point, the program can run without user interference. Any disconnections from the Image Client, 
+          LiDAR Data Client, or LiDAR Scanner will be handled automatically with smooth reconnect
+
 ```
 
-## Key Configuration (master_main.py)
-
-- **LiDAR Connection**: `LIDAR_HOST`, `LIDAR_PORT`
-- **Image Server**: `IMAGE_SERVER_HOST`, `IMAGE_SERVER_PORT`, `IMAGE_SAVE_DIR`, `IMAGE_RESOLUTION`, `BURST_SIZE`
-- **LiDAR Data Server**: `LIDAR_DATA_HOST`, `LIDAR_DATA_PORT`, `LIDAR_DATA_SAVE_DIR`
-- **Event Detection**: `EVENT_DIST_THRESHOLD`, `EVENT_START_CONFIRM_SCANS`, `EVENT_END_CONFIRM_SCANS`
-- **Reliability**: `WATCHDOG_TIMEOUT`, `CONNECTION_TIMEOUT`
 
 ## Running
 
@@ -102,11 +114,3 @@ System dependency for image capture:
 ```bash
 sudo apt-get install fswebcam
 ```
-
-## Change Summary vs Previous Structure
-
-- Replaced legacy object-tracking-centric flow with flower visit event detection.
-- Added/standardized packet-based cross-client protocol support through `communication_protocol.py`.
-- Added dedicated LiDAR data server path via `lidar_data_server.py`.
-- Added setup utility `flower_setup.py` for deriving flower index/background configuration.
-- Updated LiDAR parse path to support selective index decoding for lower per-scan processing load.

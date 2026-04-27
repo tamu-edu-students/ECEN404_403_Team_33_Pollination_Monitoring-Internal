@@ -14,6 +14,7 @@ import sys
 import os
 import threading
 import socket
+import subprocess
 from datetime import datetime
 from lidar_parser import LidarConnection
 from event_detector import EventDetector
@@ -313,6 +314,9 @@ def on_event_end(event, lidar_data_server, image_server):
 def cleanup_old_files(log_dir):
     now = time.time()
 
+    result = subprocess.run(["du", "-sh", log_dir], capture_output=True, text=True)
+    print(f"[CLEANUP] Disk usage before cleanup: {result.stdout.strip()}")
+
     for filename in os.listdir(log_dir):
         filepath = os.path.join(log_dir, filename)
 
@@ -326,6 +330,9 @@ def cleanup_old_files(log_dir):
                 except Exception as e:
                     print(f"Error deleting {filepath}: {e}")
                     break  # Stop cleanup if there's an error to avoid potential issues
+    
+    result = subprocess.run(["du", "-sh", log_dir], capture_output=True, text=True)
+    print(f"[CLEANUP] Disk usage after cleanup: {result.stdout.strip()}")
 
 def main():
     """

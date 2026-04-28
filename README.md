@@ -174,7 +174,11 @@ ECEN404_403_Team_33_Pollination_Monitoring-Internal/
 ECEN 403 / ECEN 404 — Team 33
 SICKSense PathFinder AgriPollinate 
 [`Paavan Bagla`](https://github.com/PaavanBagla)
+
 [`Josiah Faircloth`](https://github.com/Josiahtate-tamu)
+
 [`Jason Agnew`](https://github.com/oops23)
+
 [`Samuel Ramos`](https://github.com/samwr-1)
+
 Texas A&M University
